@@ -312,10 +312,10 @@ export const WhatsAppVoiceAssistant: React.FC = () => {
     ) {
       setIsReportModalOpen(true);
       return {
-        replyText: '📑 Abriendo Informe Confía360 y Previsión Fiscal Trimestral. Estimación de IVA e IRPF lista para tu gestoría.',
+        replyText: '📑 Abriendo Informe AsexIA Confia360 y Previsión Fiscal Trimestral. Estimación de IVA e IRPF lista para tu gestoría.',
         action: {
           actionKey: 'informe',
-          label: 'Informe Confía360 & Previsión Fiscal',
+          label: 'Informe AsexIA Confia360 & Previsión Fiscal',
           description: 'Modelos tributarios e informe ejecutivo oficial',
           isModal: true,
           modalName: 'report',
@@ -437,11 +437,11 @@ export const WhatsAppVoiceAssistant: React.FC = () => {
     if (text.includes('inici') || text.includes('home') || text.includes('panel') || text.includes('volver')) {
       setActiveView('inicio');
       return {
-        replyText: '🏠 Te he llevado a la Pantalla Principal (Inicio). Aquí tienes el catálogo modular y resumen ejecutivo de Confía360.',
+        replyText: '🏠 Te he llevado a la Pantalla Principal (Inicio). Aquí tienes el catálogo modular y resumen ejecutivo de AsexIA Confia360.',
         action: {
           actionKey: 'inicio',
           label: 'Ir a Inicio',
-          description: 'Pantalla principal de Confía360',
+          description: 'Pantalla principal de AsexIA Confia360',
           targetView: 'inicio',
         },
       };
@@ -756,7 +756,7 @@ export const WhatsAppVoiceAssistant: React.FC = () => {
           { label: '🧾 Subir Factura OCR', query: 'Escanear factura OCR' },
           { label: '🏦 Conciliar Bancos', query: 'Conciliar tesorería' },
           { label: '📡 Cola de Sync', query: 'Monitor de cola sync' },
-          { label: '📑 Informe Confía360', query: 'Abrir informe confía360' },
+          { label: '📑 Informe AsexIA Confia360', query: 'Abrir informe confía360' },
         ];
       case 'gestoria':
         return [
@@ -859,7 +859,7 @@ export const WhatsAppVoiceAssistant: React.FC = () => {
             inset-x-0 bottom-0 top-16 sm:top-auto sm:inset-x-auto sm:bottom-24 sm:right-6 sm:w-[410px] sm:h-[640px] sm:max-h-[85vh]
             flex flex-col bg-[#0b141a] sm:rounded-3xl shadow-2xl border border-emerald-900/40 overflow-hidden"
           role="dialog"
-          aria-label="Asistente Confía360 en vivo estilo WhatsApp"
+          aria-label="Asistente AsexIA Confia360 en vivo estilo WhatsApp"
         >
           {/* WhatsApp Header Bar */}
           <div className="bg-[#075E54] text-white px-4 py-3 flex items-center justify-between shadow-md select-none shrink-0 border-b border-emerald-800">
@@ -875,7 +875,7 @@ export const WhatsAppVoiceAssistant: React.FC = () => {
               {/* Contact Info */}
               <div className="leading-tight text-left">
                 <div className="flex items-center gap-1.5">
-                  <h3 className="font-bold text-sm tracking-wide text-white">Asistente Confía360</h3>
+                  <h3 className="font-bold text-sm tracking-wide text-white">Asistente AsexIA Confia360</h3>
                   <span className="text-[10px] bg-[#25D366] text-[#075E54] font-black px-1.5 py-0.2 rounded-full uppercase">
                     360
                   </span>
@@ -1064,7 +1064,7 @@ export const WhatsAppVoiceAssistant: React.FC = () => {
                     /* ASSISTANT MESSAGE */
                     <div className="max-w-[88%] sm:max-w-[85%] bg-[#202c33] text-slate-100 rounded-2xl rounded-tl-xs px-3.5 py-2.5 shadow-md border border-slate-700/60">
                       <div className="flex items-center gap-1.5 mb-1 text-[11px] font-bold text-[#25D366]">
-                        <span>Asistente Confía360</span>
+                        <span>Asistente AsexIA Confia360</span>
                         <ShieldCheck className="w-3 h-3 text-[#25D366]" />
                       </div>
 

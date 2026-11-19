@@ -25,7 +25,7 @@ export const INITIAL_WHATSAPP_MESSAGES: ChatCommunication[] = [
     id: 'msg_welcome_1',
     sender: 'assistant',
     type: 'text',
-    text: '👋 ¡Hola! Soy tu Asistente Confía360 en vivo (estilo WhatsApp). Puedes hablarme con tu voz 🎙️ o escribir cualquier consulta o acción.',
+    text: '👋 ¡Hola! Soy tu Asistente AsexIA Confia360 en vivo (estilo WhatsApp). Puedes hablarme con tu voz 🎙️ o escribir cualquier consulta o acción.',
     timestamp: '10:00',
     date: 'Hoy',
     status: 'read',

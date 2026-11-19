@@ -28,7 +28,7 @@ export const AgileProjectPlan: React.FC = () => {
             <span>Rol: Director de Proyecto Senior (PMP / Agile Coach)</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black font-brand tracking-tight">
-            Plan de Desarrollo Ágil ConfiA360
+            Plan de Desarrollo Ágil AsexIA Confia360
           </h2>
           <p className="text-xs sm:text-sm text-blue-100 leading-relaxed">
             Estrategia ágil basada en ciclos iterativos de 2 semanas (Scrum/Kanban híbrido). Enfoque en time-to-market sin comprometer la solidez de la arquitectura offline-first, los agentes de IA supervisada y el cumplimiento normativo laboral y fiscal.
@@ -298,7 +298,7 @@ export const AgileProjectPlan: React.FC = () => {
               Checklist de Criterios de Aceptación (Documento Maestro & Auditoría)
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Verificación funcional del 100% de los puntos identificados en la auditoría de ConfiA360.
+              Verificación funcional del 100% de los puntos identificados en la auditoría de AsexIA Confia360.
             </p>
           </div>
 

@@ -27,8 +27,8 @@ export const getScreenTitle = (
   operativaTab?: 'fichaje' | 'gastos' | 'reservas_voz' | 'rrhh_turnos' | 'economico_alertas' | 'monitor_sync',
   directorTab?: 'ux_ui_wireframes' | 'project_plan_agile' | 'software_architecture'
 ): string => {
-  if (view === 'inicio') return 'Inicio y Catálogo de Módulos Confía360';
-  if (view === 'reputacion') return 'ConfIA360 Reputación & Calidad';
+  if (view === 'inicio') return 'Inicio y Catálogo de Módulos AsexIA Confia360';
+  if (view === 'reputacion') return 'AsexIA Confia360 Reputación & Calidad';
   if (view === 'cockpit') return 'Cuadro de Mandos del Restaurante';
   if (view === 'director') {
     if (directorTab === 'ux_ui_wireframes') return 'Diseño de Pantallas del Restaurante';
@@ -52,10 +52,10 @@ export const getScreenAudioDescription = (
   directorTab?: 'ux_ui_wireframes' | 'project_plan_agile' | 'software_architecture'
 ): string => {
   if (view === 'inicio') {
-    return 'Estás en el Inicio de Confía360. Aquí puedes consultar y gestionar los módulos activos y disponibles para tu negocio, acceder rápidamente a tus tareas del día a día y explorar las soluciones sectoriales.';
+    return 'Estás en el Inicio de AsexIA Confia360. Aquí puedes consultar y gestionar los módulos activos y disponibles para tu negocio, acceder rápidamente a tus tareas del día a día y explorar las soluciones sectoriales.';
   }
   if (view === 'reputacion') {
-    return 'Estás en ConfIA360 Reputación. Aquí gestionas la experiencia del comensal, encuestas automáticas de WhatsApp con firewall de quejas, reseñas multicanal de Google y TripAdvisor con respuestas asistidas por inteligencia artificial, y tareas operativas para cocina y sala.';
+    return 'Estás en AsexIA Confia360 Reputación. Aquí gestionas la experiencia del comensal, encuestas automáticas de WhatsApp con firewall de quejas, reseñas multicanal de Google y TripAdvisor con respuestas asistidas por inteligencia artificial, y tareas operativas para cocina y sala.';
   }
   if (view === 'cockpit') {
     return 'Estás en el Cuadro de Mandos del Restaurante. Aquí consultas de un vistazo las ventas del día, el coste del personal y el beneficio neto, con pantallas adaptadas para el Dueño, el Jefe de Cocina y el Encargado de Sala.';

@@ -641,7 +641,7 @@ export const ImpactDashboard: React.FC<ImpactDashboardProps> = ({
                   onClick={() => handleJumpToModule('reputacion')}
                   className="touch-target-min text-xs font-black bg-[#022853] text-white px-3 py-2 rounded-xl hover:bg-[#0067B9] transition flex items-center gap-1.5"
                 >
-                  <span>Abrir ConfIA360 Reputación</span>
+                  <span>Abrir AsexIA Confia360 Reputación</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>

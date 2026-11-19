@@ -22,7 +22,7 @@ export const PWAInstallButton: React.FC = () => {
       <button
         onClick={install}
         className="touch-target-min inline-flex items-center gap-2 rounded-lg bg-[#0067B9] px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#022853] transition focus:outline-none focus:ring-2 focus:ring-[#80D518]"
-        aria-label="Instalar ConfiA360 en el dispositivo móvil como aplicación nativa"
+        aria-label="Instalar AsexIA Confia360 en el dispositivo móvil como aplicación nativa"
       >
         <Download className="w-4 h-4" />
         <span>Instalar App</span>
@@ -51,7 +51,7 @@ export const PWAInstallButton: React.FC = () => {
                   A
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#022853]">Instalar ConfiA360 en iOS</h3>
+                  <h3 className="text-base font-bold text-[#022853]">Instalar AsexIA Confia360 en iOS</h3>
                   <p className="text-xs text-slate-500">Para uso offline en sala y cocina</p>
                 </div>
               </div>
@@ -76,9 +76,9 @@ export const PWAInstallButton: React.FC = () => {
   // Ambient helper button on browser desktop/simulator
   return (
     <button
-      onClick={() => alert('Para instalar ConfiA360 en tu móvil o navegador, utiliza la opción "Instalar aplicación" desde el menú del navegador o accede desde un dispositivo móvil Android/iOS.')}
+      onClick={() => alert('Para instalar AsexIA Confia360 en tu móvil o navegador, utiliza la opción "Instalar aplicación" desde el menú del navegador o accede desde un dispositivo móvil Android/iOS.')}
       className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-white transition"
-      title="ConfiA360 es una PWA compatible offline"
+      title="AsexIA Confia360 es una PWA compatible offline"
     >
       <Download className="w-3.5 h-3.5 text-[#0067B9]" />
       <span>PWA Lista</span>

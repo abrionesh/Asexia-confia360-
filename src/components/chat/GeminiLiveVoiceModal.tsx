@@ -327,7 +327,7 @@ export const GeminiLiveVoiceModal: React.FC<GeminiLiveVoiceModalProps> = ({
           setConnectionStatus('connected');
           setErrorMessage(msg.message);
           // Set simulated welcoming greeting
-          setLiveModelTranscript('Hola, estoy conectado en modo voz interactiva de Confía360.');
+          setLiveModelTranscript('Hola, estoy conectado en modo voz interactiva de AsexIA Confia360.');
         } else if (msg.type === 'error') {
           setConnectionStatus('error');
           setErrorMessage(msg.message || 'Error en la sesión Gemini Live');
@@ -579,7 +579,7 @@ export const GeminiLiveVoiceModal: React.FC<GeminiLiveVoiceModalProps> = ({
 
           {/* Caller Title & Status */}
           <h3 className="text-lg font-bold text-white mb-1">
-            ConfiA360 Concierge Voz
+            AsexIA Confia360 Concierge Voz
           </h3>
 
           {/* Call Status Pill */}

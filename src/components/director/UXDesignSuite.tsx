@@ -29,7 +29,7 @@ export const UXDesignSuite: React.FC = () => {
             <span>Rol: Diseñador UX/UI & VUX Senior</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black font-brand tracking-tight">
-            Diseño de Experiencia & Wireframes ConfiA360
+            Diseño de Experiencia & Wireframes AsexIA Confia360
           </h2>
           <p className="text-xs sm:text-sm text-blue-100 leading-relaxed">
             Arquitectura de información y diseño centrado en el usuario de hostelería: cero fricción bajo condiciones extremas (ruido en sala, grasa o vapor en cocina, desconexión en sótanos y sol en terrazas). Cumplimiento riguroso de WCAG 2.2 AA y guía de marca Asexia.
@@ -125,7 +125,7 @@ export const UXDesignSuite: React.FC = () => {
                   {/* Phone Mock Header */}
                   <div className="flex items-center justify-between border-b pb-2 text-[11px] text-slate-400">
                     <span>9:41 AM</span>
-                    <span className={fidelityMode === 'hifi' ? 'text-emerald-600 font-bold' : ''}>● ConfiA360 PWA</span>
+                    <span className={fidelityMode === 'hifi' ? 'text-emerald-600 font-bold' : ''}>● AsexIA Confia360 PWA</span>
                   </div>
 
                   {fidelityMode === 'lofi' ? (
@@ -150,7 +150,7 @@ export const UXDesignSuite: React.FC = () => {
                     // Hi-Fi Prototype
                     <div className="space-y-4 text-center">
                       <div className="flex items-center justify-between">
-                        <span className="font-brand font-black text-sm text-[#022853]">ConfiA360</span>
+                        <span className="font-brand font-black text-sm text-[#022853]">AsexIA Confia360</span>
                         <span className="w-2.5 h-2.5 rounded-full bg-[#48A222]" title="Sincronizado" />
                       </div>
 
@@ -270,7 +270,7 @@ export const UXDesignSuite: React.FC = () => {
                 VUX Conversacional (Voice UX) y Árbol de Contingencia
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                <strong>Premisa VUX:</strong> Los IVRs tradicionales con árboles rígidos ("Pulse 1 para comensales...") frustran al comensal. El agente ConfiA360 comprende lenguaje natural y extrae todas las variables en un solo turno de conversación.
+                <strong>Premisa VUX:</strong> Los IVRs tradicionales con árboles rígidos ("Pulse 1 para comensales...") frustran al comensal. El agente AsexIA Confia360 comprende lenguaje natural y extrae todas las variables en un solo turno de conversación.
               </p>
             </div>
 
@@ -314,7 +314,7 @@ export const UXDesignSuite: React.FC = () => {
                 Sistema de Estados Visuales Universales (Offline-First)
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Toda entidad de ConfiA360 (fichaje, gasto, reserva, turno) posee una representación cromática estandarizada y un badge no intrusivo en el header.
+                Toda entidad de AsexIA Confia360 (fichaje, gasto, reserva, turno) posee una representación cromática estandarizada y un badge no intrusivo en el header.
               </p>
             </div>
 

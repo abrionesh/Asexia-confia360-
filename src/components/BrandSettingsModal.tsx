@@ -40,7 +40,7 @@ export const BrandSettingsModal: React.FC<{ isOpen: boolean; onClose: () => void
             </div>
             <div>
               <h2 id="brand-modal-title" className="text-base font-bold font-brand">Configuración de Marca & Accesibilidad</h2>
-              <p className="text-xs text-blue-200">Parámetros de branding ConfiA360 y directrices WCAG 2.2 AA</p>
+              <p className="text-xs text-blue-200">Parámetros de branding AsexIA Confia360 y directrices WCAG 2.2 AA</p>
             </div>
           </div>
           <button
@@ -69,11 +69,11 @@ export const BrandSettingsModal: React.FC<{ isOpen: boolean; onClose: () => void
                 value={appName}
                 onChange={(e) => setAppName(e.target.value)}
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-bold text-[#022853] focus:border-[#0067B9] focus:ring-2 focus:ring-[#0067B9]/20"
-                placeholder="ConfiA360"
+                placeholder="AsexIA Confia360"
                 required
               />
               <span className="text-[11px] text-slate-500 mt-1 block">
-                Valor por defecto: <strong>ConfiA360</strong>. Permite adaptar para franquicias o marcas blancas.
+                Valor por defecto: <strong>AsexIA Confia360</strong>. Permite adaptar para franquicias o marcas blancas.
               </span>
             </div>
 

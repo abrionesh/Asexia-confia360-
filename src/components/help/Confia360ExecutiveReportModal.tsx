@@ -57,7 +57,7 @@ export const Confia360ExecutiveReportModal: React.FC<Confia360ExecutiveReportMod
               </span>
             </div>
             <h2 id="confia360-report-title" className="text-xl sm:text-2xl font-black font-brand text-white">
-              ¿Qué es Confía360?
+              ¿Qué es AsexIA Confia360?
             </h2>
             <p className="text-xs sm:text-sm text-blue-100 mt-1 max-w-2xl leading-relaxed">
               Tratamiento de la información de negocio de principio a fin para autónomos y pymes: desde la captación y facturación hasta el desglose granular y la toma de decisiones.
@@ -112,7 +112,7 @@ export const Confia360ExecutiveReportModal: React.FC<Confia360ExecutiveReportMod
                   Definición Clave
                 </span>
                 <p className="text-slate-900 font-bold text-base leading-snug">
-                  "Confía360 no es una aplicación aislada de facturación ni un simple CRM: es un ecosistema digital de gestión integral diseñado para tratar la información del negocio de principio a fin."
+                  "AsexIA Confia360 no es una aplicación aislada de facturación ni un simple CRM: es un ecosistema digital de gestión integral diseñado para tratar la información del negocio de principio a fin."
                 </p>
                 <p className="text-xs text-slate-600">
                   Cubre todo el ciclo vital: captación $\rightarrow$ presupuestación $\rightarrow$ facturación $\rightarrow$ recepción de compras/albaranes $\rightarrow$ gastos $\rightarrow$ conciliación bancaria $\rightarrow$ fiscalidad preventiva $\rightarrow$ toma de decisiones.
@@ -157,7 +157,7 @@ export const Confia360ExecutiveReportModal: React.FC<Confia360ExecutiveReportMod
           {activeTab === 'core_sectorial' && (
             <div className="space-y-5 animate-in fade-in duration-150">
               <p className="text-xs text-slate-600">
-                La arquitectura de Confía360 separa limpiamente lo que es común a cualquier negocio de lo que es específico a su actividad económica:
+                La arquitectura de AsexIA Confia360 separa limpiamente lo que es común a cualquier negocio de lo que es específico a su actividad económica:
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -375,7 +375,7 @@ export const Confia360ExecutiveReportModal: React.FC<Confia360ExecutiveReportMod
           {activeTab === 'alarmas' && (
             <div className="space-y-5 animate-in fade-in duration-150">
               <p className="text-xs text-slate-600">
-                Confía360 convierte el registro contable en avisos accionables y predicciones para evitar sorpresas antes del cierre:
+                AsexIA Confia360 convierte el registro contable en avisos accionables y predicciones para evitar sorpresas antes del cierre:
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -412,7 +412,7 @@ export const Confia360ExecutiveReportModal: React.FC<Confia360ExecutiveReportMod
         {/* MODAL FOOTER */}
         <div className="bg-slate-50 p-4 sm:p-5 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
           <span className="text-xs text-slate-500 font-mono hidden sm:inline">
-            Confía360 · Sistema Certificado para Pymes y Autónomos
+            AsexIA Confia360 · Sistema Certificado para Pymes y Autónomos
           </span>
           <div className="flex items-center gap-2 ml-auto">
             <button

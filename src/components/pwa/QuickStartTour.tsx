@@ -49,9 +49,9 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'intro_offline',
     moduleBadge: 'Tu Restaurante Siempre Activo',
-    title: 'Bienvenido a ConfiA360: Tu Restaurante en Marcha',
+    title: 'Bienvenido a AsexIA Confia360: Tu Restaurante en Marcha',
     description:
-      'ConfiA360 está pensada para el ritmo real de un restaurante. Si la conexión a internet o el Wi-Fi falla en la cocina, en la bodega o en la terraza, todo sigue funcionando igual de rápido. Los fichajes, los pedidos y las cuentas se guardan en el teléfono y se mandan solos en cuanto vuelva la señal.',
+      'AsexIA Confia360 está pensada para el ritmo real de un restaurante. Si la conexión a internet o el Wi-Fi falla en la cocina, en la bodega o en la terraza, todo sigue funcionando igual de rápido. Los fichajes, los pedidos y las cuentas se guardan en el teléfono y se mandan solos en cuanto vuelva la señal.',
     keyHighlights: [
       'El servicio nunca se detiene: atiende a los clientes y organiza el turno sin depender de internet',
       'Instálala en el móvil o tablet como cualquier aplicación de tu teléfono',
@@ -153,7 +153,7 @@ const TOUR_STEPS: TourStep[] = [
     moduleBadge: 'Grafo & Modelo de Datos 360º',
     title: 'Modelo Relacional 360º: Cero Pantallas Aisladas',
     description:
-      'ConfiA360 interconecta las 10 entidades maestras del restaurante de forma bidireccional: Factura, Línea de Factura, Artículo/Producto, Receta, Plato/Escandallo, Reserva, Cliente CRM, Turno RRHH, Gastos y Documento. Desde cualquier entidad accedes a todo su impacto y la aplicación navega en directo a la pantalla real en segundo plano.',
+      'AsexIA Confia360 interconecta las 10 entidades maestras del restaurante de forma bidireccional: Factura, Línea de Factura, Artículo/Producto, Receta, Plato/Escandallo, Reserva, Cliente CRM, Turno RRHH, Gastos y Documento. Desde cualquier entidad accedes a todo su impacto y la aplicación navega en directo a la pantalla real en segundo plano.',
     keyHighlights: [
       'Factura: navega a Proveedor, Documento, Líneas, Pagos, IVA, Aprobaciones (8 estados) y Auditoría',
       'Línea de Factura: conecta a Artículo/Producto, Lote, Coste, Existencias, Receta y Producto de venta',
@@ -168,7 +168,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'confia360_reputacion',
     moduleBadge: 'Reputación & Experiencia 360º',
-    title: 'ConfIA360 Reputación: Calidad & Reseñas',
+    title: 'AsexIA Confia360 Reputación: Calidad & Reseñas',
     description:
       'Capa transversal que conecta el servicio real con WhatsApp, Google Business Profile y TripAdvisor. Incorpora firewall bipolar: las valoraciones 4–5★ se derivan a Google Maps con 1 clic, mientras que las notas 1–3★ se interceptan privadamente como incidencias internas para que el gerente las resuelva antes de que se publiquen en internet, asignando tareas correctivas a cocina y sala.',
     keyHighlights: [
@@ -278,7 +278,7 @@ export const QuickStartTour: React.FC = () => {
       if (!hasSeenTour) {
         const timer = setTimeout(() => {
           setIsTourOpen(true);
-          announceAriaLive('Iniciando tour guiado de bienvenida de ConfiA360 PWA');
+          announceAriaLive('Iniciando tour guiado de bienvenida de AsexIA Confia360 PWA');
         }, 800);
         return () => clearTimeout(timer);
       }
@@ -603,9 +603,9 @@ export const QuickStartTour: React.FC = () => {
     ) {
       target = {
         view: 'reputacion',
-        moduleName: 'ConfIA360 Reputación & Calidad',
+        moduleName: 'AsexIA Confia360 Reputación & Calidad',
         explanation:
-          'En ConfIA360 Reputación gestionas la experiencia del comensal. Envía encuestas por WhatsApp tras la cuenta; si puntúan 4 o 5 estrellas les invita a dejar reseña en Google, y si puntúan de 1 a 3 estrellas intercepta la queja en privado para que gerencia y cocina lo resuelvan de inmediato sin que llegue a internet.',
+          'En AsexIA Confia360 Reputación gestionas la experiencia del comensal. Envía encuestas por WhatsApp tras la cuenta; si puntúan 4 o 5 estrellas les invita a dejar reseña en Google, y si puntúan de 1 a 3 estrellas intercepta la queja en privado para que gerencia y cocina lo resuelvan de inmediato sin que llegue a internet.',
       };
     } else if (
       q.includes('arquitect') ||
@@ -707,7 +707,7 @@ export const QuickStartTour: React.FC = () => {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Tour guiado y Agente de Voz de ConfiA360 PWA"
+      aria-label="Tour guiado y Agente de Voz de AsexIA Confia360 PWA"
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200"
     >
       {/* Tour Card Box */}
@@ -1016,10 +1016,10 @@ export const QuickStartTour: React.FC = () => {
                   '¿Cómo fichan los empleados su entrada y salida?',
                   '¿Qué pasa al cargar un albarán o factura?',
                   '¿Cómo funciona la versión Pro con escandallos y márgenes?',
-                  '¿Cómo funciona el firewall de reseñas y WhatsApp en ConfIA360 Reputación?',
+                  '¿Cómo funciona el firewall de reseñas y WhatsApp en AsexIA Confia360 Reputación?',
                   '¿Qué estados posibles puede tener una factura?',
                   '¿Cómo detecta subidas de precio y proveedores alternativos?',
-                  '¿Qué es la Navegación 360º de ConfiA360?',
+                  '¿Qué es la Navegación 360º de AsexIA Confia360?',
                   '¿Cómo atiende las reservas el recepcionista virtual?',
                   '¿Dónde veo si el restaurante da beneficios hoy?',
                 ].map((chipPrompt, cIdx) => (
@@ -1048,7 +1048,7 @@ export const QuickStartTour: React.FC = () => {
                     </span>
                     <div>
                       <span className="text-[10px] uppercase font-black text-[#0067B9] tracking-wider block">
-                        Respuesta del Agente ConfiA360
+                        Respuesta del Agente AsexIA Confia360
                       </span>
                       <strong className="text-xs font-bold text-slate-900">
                         {agentAnswer.target.moduleName}

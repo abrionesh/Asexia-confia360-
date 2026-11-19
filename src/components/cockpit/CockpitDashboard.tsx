@@ -68,7 +68,7 @@ export const CockpitDashboard: React.FC = () => {
   const { brandConfig, isOnline, triggerManualSync, isSyncingNow, announceAriaLive } = useApp();
 
   // Filters state per DASH-001
-  const [selectedCompany, setSelectedCompany] = useState('Grupo ConfIA360 Gastro');
+  const [selectedCompany, setSelectedCompany] = useState('Grupo AsexIA Confia360 Gastro');
   const [selectedVenue, setSelectedVenue] = useState('Todos los locales');
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('mes');
   const [selectedComparison, setSelectedComparison] = useState<ComparisonType>('periodo_anterior');
@@ -188,7 +188,7 @@ export const CockpitDashboard: React.FC = () => {
               onChange={(e) => setSelectedCompany(e.target.value)}
               className="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800"
             >
-              <option value="Grupo ConfIA360 Gastro">Grupo ConfIA360 Gastro</option>
+              <option value="Grupo AsexIA Confia360 Gastro">Grupo AsexIA Confia360 Gastro</option>
               <option value="Asexia Restauración S.L.">Asexia Restauración S.L.</option>
             </select>
           </div>

@@ -81,7 +81,7 @@ export const UserProfileIdentityModal: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Datos operativos del negocio sincronizados con el ecosistema Confía360
+                Datos operativos del negocio sincronizados con el ecosistema AsexIA Confia360
               </p>
             </div>
           </div>

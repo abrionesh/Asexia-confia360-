@@ -39,7 +39,7 @@ export const LocalMarketingTab: React.FC<LocalMarketingTabProps> = ({
   const competitors = INITIAL_COMPETITORS;
 
   const handleCopySocialPost = (review: typeof featuredReviews[0]) => {
-    const postText = `⭐⭐⭐⭐⭐ "${review.texto}"\n\n— ${review.autor} en ${review.plataforma.toUpperCase()}.\n\n¡Gracias por elegirnos y valorar el trabajo de todo el equipo de cocina y sala! Ven a probarlo tú también. Reserva tu mesa hoy en ConfiA360.\n\n#GastronomiaMadrid #ComerBien #ConfIA360`;
+    const postText = `⭐⭐⭐⭐⭐ "${review.texto}"\n\n— ${review.autor} en ${review.plataforma.toUpperCase()}.\n\n¡Gracias por elegirnos y valorar el trabajo de todo el equipo de cocina y sala! Ven a probarlo tú también. Reserva tu mesa hoy en AsexIA Confia360.\n\n#GastronomiaMadrid #ComerBien #AsexIAConfia360`;
     navigator.clipboard?.writeText(postText);
     setCopiedReviewId(review.id);
     setTimeout(() => setCopiedReviewId(null), 2000);
@@ -234,7 +234,7 @@ export const LocalMarketingTab: React.FC<LocalMarketingTabProps> = ({
               <tr className="bg-blue-50/60 font-bold border-b border-blue-200">
                 <td className="p-3 text-[#0067B9] flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-[#80D518]" />
-                  <span>Nuestro Restaurante (ConfiA360)</span>
+                  <span>Nuestro Restaurante (AsexIA Confia360)</span>
                 </td>
                 <td className="p-3 font-mono">0.0 km</td>
                 <td className="p-3 font-mono text-amber-600">4.82★</td>

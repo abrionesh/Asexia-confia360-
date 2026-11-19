@@ -23,7 +23,7 @@ export const HRShiftAgent: React.FC = () => {
   >([
     {
       sender: 'agent',
-      text: '¡Hola Carlos! Soy tu asistente de RRHH y Turnos en ConfiA360. Tienes un turno asignado mañana en el restaurante a las 10:00. ¿Deseas confirmarlo?',
+      text: '¡Hola Carlos! Soy tu asistente de RRHH y Turnos en AsexIA Confia360. Tienes un turno asignado mañana en el restaurante a las 10:00. ¿Deseas confirmarlo?',
       time: '09:00',
       actionCard: {
         type: 'confirm_shift',
@@ -136,7 +136,7 @@ export const HRShiftAgent: React.FC = () => {
                 HR
               </div>
               <div>
-                <h3 className="text-xs font-bold text-[#022853]">Asistente de Empleado ConfiA360</h3>
+                <h3 className="text-xs font-bold text-[#022853]">Asistente de Empleado AsexIA Confia360</h3>
                 <span className="text-[10px] text-slate-400">Carlos Ruiz (Sala) · En línea</span>
               </div>
             </div>

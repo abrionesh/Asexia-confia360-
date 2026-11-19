@@ -211,7 +211,7 @@ const AppContent: React.FC = () => {
         {/* VIEW 4: CONFIA360 REPUTACIÓN (FASES 1 A 4)                */}
         {/* ========================================================= */}
         {activeView === 'reputacion' && (
-          <section className="animate-in fade-in duration-200" aria-label="Módulo ConfIA360 Reputación">
+          <section className="animate-in fade-in duration-200" aria-label="Módulo AsexIA Confia360 Reputación">
             <ReputationModule />
           </section>
         )}

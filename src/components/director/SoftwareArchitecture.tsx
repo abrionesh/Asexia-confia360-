@@ -73,7 +73,7 @@ export const SoftwareArchitecture: React.FC = () => {
               Evaluación Rigurosa de Tecnologías & Selección Final
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Análisis comparativo de frameworks y motores para las condiciones operativas de ConfiA360.
+              Análisis comparativo de frameworks y motores para las condiciones operativas de AsexIA Confia360.
             </p>
           </div>
 
@@ -310,7 +310,7 @@ export const SoftwareArchitecture: React.FC = () => {
           </div>
 
           <div className="bg-slate-900 rounded-2xl p-5 text-emerald-400 font-mono text-xs overflow-x-auto space-y-3 shadow-inner">
-            <div className="text-slate-400">// Tabla de Interacciones de Agentes Especializados (Propuesta Auditoría ConfiA360)</div>
+            <div className="text-slate-400">// Tabla de Interacciones de Agentes Especializados (Propuesta Auditoría AsexIA Confia360)</div>
             <pre className="text-slate-100 whitespace-pre-wrap">{`CREATE TABLE ai_agent_interactions (
   id TEXT PRIMARY KEY,
   agent_type TEXT NOT NULL, -- 'voice_reservations', 'chat_shifts', 'economic'

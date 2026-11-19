@@ -1,5 +1,5 @@
 {
-  "name": "ConfiA360 - Suite Digital y Operaciones Offline",
+  "name": "AsexIA Confia360",
   "description": "PWA offline-first para hostelería y pymes con fichaje inteligente cero-toque, captura OCR de tickets, agentes IA supervisados (Voz 24/7, RRHH y Gastos) y accesibilidad WCAG 2.2 AA.",
   "requestFramePermissions": ["geolocation", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

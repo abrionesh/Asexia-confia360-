@@ -143,7 +143,7 @@ export const FeedbackSimulatorTab: React.FC<FeedbackSimulatorTabProps> = ({
           <div className="flex items-center justify-between pb-3 px-2 border-b border-slate-800 text-xs text-slate-400">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-bold text-white">WhatsApp Bot · ConfiA360</span>
+              <span className="font-bold text-white">WhatsApp Bot · AsexIA Confia360</span>
             </div>
             <span className="font-mono text-[10px]">15:42</span>
           </div>

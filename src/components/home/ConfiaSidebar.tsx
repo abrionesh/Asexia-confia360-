@@ -70,16 +70,16 @@ export const ConfiaSidebar: React.FC<ConfiaSidebarProps> = ({
               onClick={() => handleNav(() => setActiveView('inicio'))}
               className="flex items-center gap-3 text-left focus:outline-hidden group"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0067B9] via-[#022853] to-[#021f42] border border-white/20 flex items-center justify-center shadow-md relative overflow-hidden group-hover:scale-105 transition-transform">
-                <span className="font-brand font-black text-white text-xl tracking-tight">C</span>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0067B9] via-[#022853] to-[#021f42] border border-white/20 flex items-center justify-center shadow-md relative overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
+                <span className="font-brand font-black text-white text-xl tracking-tight">A</span>
                 <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#80D518] border-2 border-[#022853]" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-brand font-black text-lg text-white tracking-wide">
-                    {brandConfig.appName || 'ConfiA360'}
+                  <span className="font-brand font-black text-sm text-white tracking-wide leading-tight truncate">
+                    {brandConfig.appName || 'AsexIA Confia360'}
                   </span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#80D518]/25 text-[#80D518] border border-[#80D518]/50 uppercase tracking-wider">
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#80D518]/25 text-[#80D518] border border-[#80D518]/50 uppercase tracking-wider shrink-0">
                     ECO
                   </span>
                 </div>
@@ -303,8 +303,8 @@ export const ConfiaSidebar: React.FC<ConfiaSidebarProps> = ({
               className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 transition-all mt-2"
             >
               <div className="flex items-center gap-2">
-                <FileQuestion className="w-4 h-4 text-emerald-400" />
-                <span>¿Qué es Confía360?</span>
+                <FileQuestion className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="truncate">¿Qué es AsexIA Confia360?</span>
               </div>
               <span className="text-[10px] font-bold text-emerald-200">Doc</span>
             </button>

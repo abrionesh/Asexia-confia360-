@@ -380,7 +380,7 @@ export const RosettaGraphExplorer: React.FC = () => {
                     </div>
                     <div>
                       <span className="text-xs font-black font-brand text-[#022853]">
-                        Capacidades Versión Pro ConfiA360: Impacto de Precios, Escandallos & Proveedores
+                        Capacidades Versión Pro AsexIA Confia360: Impacto de Precios, Escandallos & Proveedores
                       </span>
                       <span className="text-[11px] text-slate-600 block">
                         Al cargar el albarán/factura, se actualizan productos, se verifican precios y se auditan márgenes de cocina
@@ -569,7 +569,7 @@ export const RosettaGraphExplorer: React.FC = () => {
         <div className="flex items-center gap-2">
           <Info className="w-4 h-4 text-[#0067B9] shrink-0" />
           <span className="font-bold text-slate-800">
-            Resumen Arquitectural del Modelo de Relaciones ConfiA360:
+            Resumen Arquitectural del Modelo de Relaciones AsexIA Confia360:
           </span>
         </div>
         <p className="text-[11px] leading-relaxed">

@@ -59,7 +59,7 @@ export const ReputationModule: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-brand font-black text-lg sm:text-xl text-[#022853]">
-                  ConfIA360 Reputación
+                  AsexIA Confia360 Reputación
                 </span>
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#80D518]/20 text-[#022853] border border-[#80D518]/40">
                   Fases 1 a 4

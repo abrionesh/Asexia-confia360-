@@ -165,7 +165,7 @@ export const ProfileExecutiveSummary: React.FC = () => {
                 onClick={() => setIsReportModalOpen(true)}
                 className="px-3.5 py-1.5 rounded-lg bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-200 border border-indigo-700/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
               >
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Informe Fiscal Confía360
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Informe Fiscal AsexIA Confia360
               </button>
               <button
                 onClick={() => openDrawer360('albaran')}

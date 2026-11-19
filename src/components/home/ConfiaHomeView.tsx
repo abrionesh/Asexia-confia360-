@@ -286,10 +286,10 @@ export const ConfiaHomeView: React.FC<ConfiaHomeViewProps> = ({ onOpenMobileMenu
           <button
             onClick={() => setIsReportModalOpen(true)}
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-2xs transition-colors"
-            title="Ver informe sobre qué es Confia360"
+            title="Ver informe sobre qué es AsexIA Confia360"
           >
             <HelpCircle className="w-3.5 h-3.5 text-[#0067B9]" />
-            <span className="hidden lg:inline">Informe Confía360</span>
+            <span className="hidden lg:inline">Informe AsexIA Confia360</span>
           </button>
 
           {/* Asistente Voz WhatsApp Button */}
@@ -602,7 +602,7 @@ export const ConfiaHomeView: React.FC<ConfiaHomeViewProps> = ({ onOpenMobileMenu
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
             <div className="flex items-center gap-2.5">
               <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
-                Gestión Empresarial • Core Universal Confía360
+                Gestión Empresarial • Core Universal AsexIA Confia360
               </h2>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
                 Core Pyme Universal
@@ -687,7 +687,7 @@ export const ConfiaHomeView: React.FC<ConfiaHomeViewProps> = ({ onOpenMobileMenu
               ARQUITECTURA DE DATOS ÚNICA
             </span>
             <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              ¿Por qué Confía360 es diferente a un CRM o software tradicional?
+              ¿Por qué AsexIA Confia360 es diferente a un CRM o software tradicional?
             </h3>
             <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed">
               Trata de principio a final la información de autónomos y pymes con un core central universal y módulos sectoriales integrados. Permite desglosar cualquier total, seleccionar un registro y navegar en 360° por todas las entidades asociadas con alarmas y predicción.
@@ -746,7 +746,7 @@ export const ConfiaHomeView: React.FC<ConfiaHomeViewProps> = ({ onOpenMobileMenu
             </p>
 
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 space-y-1">
-              <p className="font-bold text-slate-800">Integración con el Core Confía360:</p>
+              <p className="font-bold text-slate-800">Integración con el Core AsexIA Confia360:</p>
               <p className="text-slate-600">
                 Este módulo se activa sin duplicar datos ni requerir migraciones complejas. Utiliza la misma base de clientes, compras, asientos contables y cuadro de mando.
               </p>

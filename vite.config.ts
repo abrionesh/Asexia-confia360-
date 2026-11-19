@@ -11,11 +11,12 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
+        includeAssets: ['favicon.ico', 'icon.svg'],
         manifest: {
           id: '/',
-          name: 'ConfiA360 - Suite Digital y Operaciones Offline',
-          short_name: 'ConfiA360',
+          lang: 'es',
+          name: 'AsexIA Confia360 - Suite Digital y Operaciones Offline',
+          short_name: 'AsexIA Confia360',
           description: 'PWA offline-first para hostelería y pymes: fichaje cero-toque, OCR de tickets y agentes IA supervisados.',
           theme_color: '#022853',
           background_color: '#F3F7FA',
@@ -32,7 +33,10 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          globPatterns: ['**/*.{js,css,html,woff,woff2}'],
+          globIgnores: ['**/assets/aistudio/**'],
+          navigateFallbackDenylist: [/^\/api/, /^\/ws/],
         },
         devOptions: {
           enabled: true,

@@ -23,7 +23,7 @@ const STORAGE_KEYS = {
 
 // Default Brand Config following Asexia Brand Guide
 export const DEFAULT_BRAND_CONFIG: BrandConfig = {
-  appName: 'ConfiA360',
+  appName: 'AsexIA Confia360',
   tagline: 'Tu negocio más seguro, digital y eficiente',
   venueName: 'Restaurante & Gastrobar Puerta del Sol',
   primaryColor: '#022853', // Asexia Navy
@@ -339,7 +339,12 @@ export const LocalDB = {
   getBrandConfig(): BrandConfig {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.BRAND_CONFIG);
-      return saved ? { ...DEFAULT_BRAND_CONFIG, ...JSON.parse(saved) } : DEFAULT_BRAND_CONFIG;
+      if (!saved) return DEFAULT_BRAND_CONFIG;
+      const merged = { ...DEFAULT_BRAND_CONFIG, ...JSON.parse(saved) };
+      if (['ConfiA360', 'ConfIA360', 'Confía360', 'Confia360'].includes(merged.appName)) {
+        merged.appName = DEFAULT_BRAND_CONFIG.appName;
+      }
+      return merged;
     } catch {
       return DEFAULT_BRAND_CONFIG;
     }

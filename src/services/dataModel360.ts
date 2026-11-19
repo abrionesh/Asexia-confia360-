@@ -1129,7 +1129,7 @@ export const ENTITY_HUBS_360: Record<EntityHubType, Entity360HubData> = {
     id: 'reputacion_hub',
     hubType: 'reputacion',
     code: 'REP-HUB-360',
-    title: 'ConfIA360 Reputación & Calidad Gastronómica',
+    title: 'AsexIA Confia360 Reputación & Calidad Gastronómica',
     subtitle: 'CSAT 4.8★ · 342 reseñas Google · NPS +68 · Firewall anti-crisis activo · Tasa respuesta 82%',
     statusBadge: { label: 'Reputación Excelente', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
     keyMetrics: {
@@ -1214,7 +1214,7 @@ export const ENTITY_HUBS_360: Record<EntityHubType, Entity360HubData> = {
     ],
     auditInfo: {
       hash: 'sha256:88a7c199201f',
-      lastUser: 'ConfIA360 Reputación & Bot WhatsApp',
+      lastUser: 'AsexIA Confia360 Reputación & Bot WhatsApp',
       timestamp: '12/10/2026 23:59:00',
       syncStatus: 'synced',
     },

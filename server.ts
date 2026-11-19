@@ -2,14 +2,11 @@ import express from 'express';
 import http from 'http';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'fs';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { WebSocketServer, WebSocket } from 'ws';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -42,7 +39,7 @@ app.post('/api/gemini/reservation-voice', async (req, res) => {
     }
 
     if (aiClient) {
-      const prompt = `Eres el Agente de Reservas y Sala de ConfiA360 (Hostelería).
+      const prompt = `Eres el Agente de Reservas y Sala de AsexIA Confia360 (Hostelería).
 El usuario dijo: "${transcript}".
 Estado actual de datos: ${JSON.stringify(currentReservation || {})}.
 Fallas consecutivas previas en entender: ${failCount}.
@@ -148,11 +145,11 @@ app.post('/api/gemini/hr-assistant', async (req, res) => {
       name: 'Carlos Ruiz',
       role: 'Camarero / Sala',
       vacationDaysLeft: 14,
-      nextShift: { date: 'Mañana', time: '10:00 - 16:30', location: 'Local Centro (Restaurante ConfiA360)' },
+      nextShift: { date: 'Mañana', time: '10:00 - 16:30', location: 'Local Centro (Restaurante AsexIA Confia360)' },
     };
 
     if (aiClient) {
-      const prompt = `Eres el Agente Inteligente de RRHH y Turnos de ConfiA360 para empleados de hostelería.
+      const prompt = `Eres el Agente Inteligente de RRHH y Turnos de AsexIA Confia360 para empleados de hostelería.
 El empleado es: ${JSON.stringify(emp)}.
 El mensaje del empleado es: "${message}".
 
@@ -239,7 +236,7 @@ app.post('/api/gemini/economic-ocr', async (req, res) => {
       const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
       const cleanBase64 = imageBase64.replace(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,/, '');
 
-      const prompt = `Eres el Agente Económico y Auditor de Facturas de ConfiA360 para hostelería.
+      const prompt = `Eres el Agente Económico y Auditor de Facturas de AsexIA Confia360 para hostelería.
 Analiza este ticket/factura gastronómica o de suministro.
 1. Extrae:
    - providerName (Nombre del emisor o proveedor)
@@ -342,7 +339,7 @@ Devuelve ÚNICAMENTE un JSON con:
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    appName: 'ConfiA360',
+    appName: 'AsexIA Confia360',
     branding: 'Asexia Digitalización',
     geminiActive: !!aiClient,
     timestamp: new Date().toISOString(),
@@ -383,7 +380,7 @@ wss.on('connection', async (clientWs: WebSocket) => {
             prebuiltVoiceConfig: { voiceName: 'Aoede' },
           },
         },
-        systemInstruction: `Eres el Asistente de Voz en Vivo de ConfiA360 para hostelería y pymes en España.
+        systemInstruction: `Eres el Asistente de Voz en Vivo de AsexIA Confia360 para hostelería y pymes en España.
 Tu labor es conversar en tiempo real con el usuario de manera natural, ejecutiva, cálida y en español fluido.
 Puedes responder sobre:
 1. Presencia y Fichaje laboral: cómo fichar con cero toque, estado de jornada, horas trabajadas.
@@ -437,20 +434,24 @@ DIRECTRICES DE CONVERSACIÓN HABLADA:
           }
 
           // Handle server-side transcriptions
-          if (message.serverContent?.outputAudioTranscription?.text) {
+          const outputText = (message.serverContent as any)?.outputTranscription?.text
+            || (message.serverContent as any)?.outputAudioTranscription?.text;
+          if (outputText) {
             clientWs.send(
               JSON.stringify({
                 type: 'model_transcription',
-                text: message.serverContent.outputAudioTranscription.text,
+                text: outputText,
               })
             );
           }
 
-          if (message.serverContent?.inputAudioTranscription?.text) {
+          const inputText = (message.serverContent as any)?.inputTranscription?.text
+            || (message.serverContent as any)?.inputAudioTranscription?.text;
+          if (inputText) {
             clientWs.send(
               JSON.stringify({
                 type: 'user_transcription',
-                text: message.serverContent.inputAudioTranscription.text,
+                text: inputText,
               })
             );
           }
@@ -560,15 +561,34 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, 'dist');
-    app.use(express.static(distPath));
+    const cwdDist = path.resolve(process.cwd(), 'dist');
+    const distPath = fs.existsSync(cwdDist)
+      ? cwdDist
+      : path.resolve(path.dirname(process.argv[1] || process.cwd()), '..', 'dist');
+
+    // Return clean JSON 404 for unknown API endpoints instead of SPA HTML
+    app.all('/api/*', (req, res) => {
+      res.status(404).json({ error: 'API endpoint not found', path: req.originalUrl });
+    });
+
+    app.use(
+      express.static(distPath, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('index.html') || filePath.endsWith('sw.js') || filePath.endsWith('registerSW.js')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          }
+        },
+      })
+    );
+
     app.get('*', (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(path.resolve(distPath, 'index.html'));
     });
   }
 
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`ConfiA360 server running on http://0.0.0.0:${PORT}`);
+    console.log(`AsexIA Confia360 server running on http://0.0.0.0:${PORT}`);
   });
 }
 

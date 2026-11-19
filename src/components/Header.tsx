@@ -72,15 +72,15 @@ export const Header: React.FC = () => {
               <button
                 onClick={() => setActiveView('inicio')}
                 className="flex items-center gap-2.5 text-left focus:outline-none focus:ring-2 focus:ring-[#80D518] rounded-xl p-1"
-                aria-label="Ir a inicio de ConfiA360"
+                aria-label="Ir a inicio de AsexIA Confia360"
               >
-                <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-[#0067B9] via-[#022853] to-[#022853] border border-white/20 flex items-center justify-center shadow-md overflow-hidden">
+                <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-[#0067B9] via-[#022853] to-[#022853] border border-white/20 flex items-center justify-center shadow-md overflow-hidden shrink-0">
                   <span className="font-brand font-black text-white text-xl tracking-tight">A</span>
                   <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#80D518] border-2 border-[#022853]" />
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-brand font-black text-base sm:text-lg text-white tracking-wide">
+                    <span className="font-brand font-black text-sm sm:text-base text-white tracking-wide whitespace-nowrap">
                       {brandConfig.appName}
                     </span>
                     <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-[#80D518]/25 text-[#80D518] border border-[#80D518]/50 uppercase tracking-wider">
@@ -255,15 +255,15 @@ export const Header: React.FC = () => {
                 <span className="md:hidden">360º</span>
               </button>
 
-              {/* Botón Informe Ejecutivo Confía360 */}
+              {/* Botón Informe Ejecutivo AsexIA Confia360 */}
               <button
                 onClick={() => setIsReportModalOpen(true)}
                 className="touch-target-min inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-[#80D518]/20 hover:bg-[#80D518]/30 text-[#80D518] border border-[#80D518]/50 shadow-2xs transition"
-                title="Ver informe ejecutivo y arquitectura del ecosistema Confía360"
-                aria-label="Abrir informe Confía360"
+                title="Ver informe ejecutivo y arquitectura del ecosistema AsexIA Confia360"
+                aria-label="Abrir informe AsexIA Confia360"
               >
                 <Info className="w-3.5 h-3.5" />
-                <span className="hidden xl:inline">¿Qué es Confía360?</span>
+                <span className="hidden xl:inline">¿Qué es AsexIA Confia360?</span>
                 <span className="xl:hidden">Informe</span>
               </button>
 
@@ -295,7 +295,7 @@ export const Header: React.FC = () => {
               <button
                 onClick={() => startTour('tour')}
                 className="touch-target-min inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-[#0067B9]/45 hover:bg-[#0067B9]/70 text-white border border-blue-400/40 transition shadow-xs"
-                title="Iniciar tour guiado de ConfiA360 PWA"
+                title="Iniciar tour guiado de AsexIA Confia360 PWA"
                 aria-label="Abrir tour guiado de la aplicación"
               >
                 <Compass className="w-3.5 h-3.5 text-[#80D518]" />
@@ -365,7 +365,7 @@ export const Header: React.FC = () => {
                 onClick={() => setIsSettingsOpen(true)}
                 className="touch-target-min p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition border border-white/10"
                 title="Configuración de Marca (Parametrizable) y Accesibilidad WCAG"
-                aria-label="Abrir configuración de marca ConfiA360 y accesibilidad"
+                aria-label="Abrir configuración de marca AsexIA Confia360 y accesibilidad"
               >
                 <Sliders className="w-4 h-4" />
               </button>
@@ -457,7 +457,7 @@ export const Header: React.FC = () => {
                   }`}
                 >
                   <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  <span>Reputación (ConfIA360)</span>
+                  <span>Reputación (AsexIA Confia360)</span>
                 </button>
               </div>
 

@@ -840,7 +840,7 @@ export const Invoice360Modal: React.FC<Invoice360ModalProps> = ({ invoice, onClo
                   </div>
 
                   <div className="pt-3 border-t border-dashed border-slate-300 text-center text-[10px] text-slate-400">
-                    Documento auditado por el motor ConfiA360 · Firma digital hash verificada
+                    Documento auditado por el motor AsexIA Confia360 · Firma digital hash verificada
                   </div>
                 </div>
               </div>

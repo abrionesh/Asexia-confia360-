@@ -29,7 +29,7 @@ export const VoiceReservationAgent: React.FC = () => {
   const [callLog, setCallLog] = useState<{ sender: 'agent' | 'user' | 'system'; text: string; time: string }[]>([
     {
       sender: 'agent',
-      text: '¡Hola! Bienvenido al servicio de reservas 24/7 de ConfiA360. ¿Para cuántas personas y qué día u hora desea su mesa?',
+      text: '¡Hola! Bienvenido al servicio de reservas 24/7 de AsexIA Confia360. ¿Para cuántas personas y qué día u hora desea su mesa?',
       time: '12:00',
     },
   ]);
@@ -286,7 +286,7 @@ export const VoiceReservationAgent: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 text-[10px] opacity-75 font-semibold">
-                      <span>{entry.sender === 'user' ? '👤 Cliente (Llamante)' : '🤖 Agente ConfiA360'}</span>
+                      <span>{entry.sender === 'user' ? '👤 Cliente (Llamante)' : '🤖 Agente AsexIA Confia360'}</span>
                       <span>{entry.time}</span>
                     </div>
                     <p className="leading-relaxed">{entry.text}</p>

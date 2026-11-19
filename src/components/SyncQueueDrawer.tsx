@@ -266,7 +266,7 @@ export const SyncQueueDrawer: React.FC<{ isOpen: boolean; onClose: () => void }>
             <span>Abrir Monitor Completo (SyncStatusMonitor)</span>
           </button>
           <p className="text-[11px] text-slate-500 font-medium">
-            Regla de oro ConfiA360: Las operaciones offline nunca bloquean al empleado en sala ni en cocina.
+            Regla de oro AsexIA Confia360: Las operaciones offline nunca bloquean al empleado en sala ni en cocina.
           </p>
         </div>
       </div>
