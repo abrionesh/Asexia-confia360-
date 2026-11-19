@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --brand-navy: #022853;
+    --brand-blue: #0067B9;
+    --brand-green: #48A222;
+    --brand-lime: #80D518;
+    --brand-ice: #F3F7FA;
+    --brand-gold: #D6A52A;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  h1, h2, h3, h4, .font-brand {
+    font-family: 'Montserrat', system-ui, sans-serif;
+  }
+}
+
+/* Accessible focus ring for WCAG 2.2 AA */
+:focus-visible {
+  outline: 3px solid #0067B9;
+  outline-offset: 2px;
+}
+
+/* Ensure minimum touch target for mobile actions */
+.touch-target-min {
+  min-width: 48px;
+  min-height: 48px;
+}
+
+/* Pulse animation for sync indicators */
+@keyframes sync-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-sync-spin {
+  animation: sync-spin 1.2s linear infinite;
+}
