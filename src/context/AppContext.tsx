@@ -11,6 +11,7 @@ import {
   OperativaTabId,
   OperativaModuleKPI,
   MonthlyPerformanceSummary,
+  OperationalThresholdsConfig,
 } from '../types';
 import { LocalDB, DEFAULT_BRAND_CONFIG } from '../services/storage';
 import { ApiService } from '../services/api';
@@ -174,6 +175,8 @@ interface AppContextType {
   getAllOperativaModuleKPIs: (role?: UserRole) => Record<OperativaTabId, OperativaModuleKPI[]>;
   currentOperativaKPIs: OperativaModuleKPI[];
   monthlyPerformanceKPIs: MonthlyPerformanceSummary;
+  operationalThresholds: OperationalThresholdsConfig;
+  updateOperationalThresholds: (updates: Partial<OperationalThresholdsConfig>) => void;
 
   // Sync Queue & Conflict Resolution
   syncQueue: SyncQueueItem[];
@@ -208,11 +211,33 @@ interface AppContextType {
   addAgentInteraction: (interaction: Omit<AgentInteraction, 'id' | 'updatedAt'>) => void;
 }
 
+export const DEFAULT_OPERATIONAL_THRESHOLDS: OperationalThresholdsConfig = {
+  minGpsCompliancePct: 90,
+  minActiveEmployeesPunched: 1,
+  maxAuditAlertsAllowed: 0,
+  maxPendingExpensesAllowed: 1,
+  minOccupancyPct: 20,
+  minShiftCoveragePct: 80,
+  minAccountingSyncPct: 90,
+  maxPendingSyncCount: 0,
+  maxUnresolvedConflicts: 0,
+  minSalesMonthlyChangePct: 0,
+  maxLaborCostRatioPct: 35,
+  minNetMarginAfterLaborPct: 65,
+};
+
 const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Brand Configuration
   const [brandConfig, setBrandConfig] = useState<BrandConfig>(LocalDB.getBrandConfig);
+  const [operationalThresholds, setOperationalThresholds] = useState<OperationalThresholdsConfig>(
+    DEFAULT_OPERATIONAL_THRESHOLDS
+  );
+
+  const updateOperationalThresholds = useCallback((updates: Partial<OperationalThresholdsConfig>) => {
+    setOperationalThresholds((prev) => ({ ...prev, ...updates }));
+  }, []);
 
   // Views & Tabs
   const [activeView, setActiveViewInternal] = useState<'inicio' | 'operativa' | 'cockpit' | 'director' | 'reputacion'>('inicio');
@@ -1062,6 +1087,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isFavorable: salesMonthlyChangePct >= 0,
         targetHint: `Objetivo mensual: +5,0% · Ticket medio ${ticketMedio.toFixed(2)} €`,
         driverSummary: `${activeReservations.length} reservas activas (${activeGuests} pax) · Base multi-local integrada`,
+        thresholdAlert:
+          salesMonthlyChangePct < operationalThresholds.minSalesMonthlyChangePct
+            ? {
+                metricKey: 'ventas',
+                currentValue: salesMonthlyChangePct,
+                thresholdValue: operationalThresholds.minSalesMonthlyChangePct,
+                unit: '%',
+                direction: 'min',
+                severity: 'critical',
+                message: `Crecimiento de ventas (${salesMonthlyChangePct.toFixed(1)}%) por debajo del mínimo operativo (${operationalThresholds.minSalesMonthlyChangePct.toFixed(1)}%).`,
+              }
+            : undefined,
       },
       costeLaboral: {
         id: 'coste_laboral',
@@ -1073,13 +1110,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         previousRatioPct: previousLaborRatioPct,
         ratioDeltaPts,
         isFavorable: ratioDeltaPts <= 0,
-        targetHint: `Ratio óptimo < 35,0% s/ ventas (mes ant.: ${previousLaborRatioPct.toFixed(1)}%)`,
+        targetHint: `Ratio óptimo < ${operationalThresholds.maxLaborCostRatioPct.toFixed(1)}% s/ ventas (mes ant.: ${previousLaborRatioPct.toFixed(1)}%)`,
         driverSummary: `${shifts.length} turnos (${totalShiftHours.toFixed(1)}h) · ${entryPunchesCount} fichajes entrada · ${businessIdentity.employeeCount} emp.`,
+        thresholdAlert:
+          currentLaborRatioPct > operationalThresholds.maxLaborCostRatioPct
+            ? {
+                metricKey: 'coste_laboral',
+                currentValue: currentLaborRatioPct,
+                thresholdValue: operationalThresholds.maxLaborCostRatioPct,
+                unit: '%',
+                direction: 'max',
+                severity: currentLaborRatioPct > operationalThresholds.maxLaborCostRatioPct + 5 ? 'critical' : 'warning',
+                message: `Ratio de coste laboral (${currentLaborRatioPct.toFixed(1)}%) supera el umbral máximo (${operationalThresholds.maxLaborCostRatioPct.toFixed(1)}%).`,
+              }
+            : undefined,
       },
       netMarginAfterLaborPct: Number((100 - currentLaborRatioPct).toFixed(1)),
       dailySeries7d,
     };
-  }, [reservations, shifts, punches, expenses, businessIdentity.employeeCount]);
+  }, [reservations, shifts, punches, expenses, businessIdentity.employeeCount, operationalThresholds]);
 
   // Role-priority map & Dynamic KPIs calculator explicitly mapped to activeOperativaTab + activeRole
   const getOperativaModuleKPIs = useCallback(
@@ -1170,16 +1219,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               iconKey: 'users',
               targetElementId: 'historial-fichajes',
               calculationFormula: `Empleados únicos (${uniqueEmployees}) con registro hoy. Ratio Coste Laboral = (${formatEur(monthlyPerformanceKPIs.costeLaboral.currentAmount)} / ${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)}) × 100 = ${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}%.`,
+              thresholdAlert:
+                (uniqueEmployees || entryPunches) < operationalThresholds.minActiveEmployeesPunched
+                  ? {
+                      metricKey: 'minActiveEmployeesPunched',
+                      currentValue: uniqueEmployees || entryPunches,
+                      thresholdValue: operationalThresholds.minActiveEmployeesPunched,
+                      unit: ' emp.',
+                      direction: 'min',
+                      severity: 'critical',
+                      message: `Personal fichado (${uniqueEmployees || entryPunches}) por debajo del mínimo operativo (${operationalThresholds.minActiveEmployeesPunched}).`,
+                    }
+                  : undefined,
             },
             {
               id: 'fichaje-gps',
               label: 'Perímetro GPS Local',
               value: `${gpsCompliancePct}% en radio`,
               subtext: `${withinRadiusCount}/${punches.length} fichajes validados (<150m)`,
-              highlight: gpsCompliancePct >= 90 ? 'text-cyan-300' : 'text-amber-400',
+              highlight: gpsCompliancePct >= operationalThresholds.minGpsCompliancePct ? 'text-cyan-300' : 'text-amber-400',
               iconKey: 'shield_check',
               targetElementId: 'historial-fichajes',
               calculationFormula: `(% Validación GPS) = (${withinRadiusCount} en radio ≤150m / ${punches.length} fichajes totales) × 100 = ${gpsCompliancePct}%.`,
+              thresholdAlert:
+                gpsCompliancePct < operationalThresholds.minGpsCompliancePct
+                  ? {
+                      metricKey: 'minGpsCompliancePct',
+                      currentValue: gpsCompliancePct,
+                      thresholdValue: operationalThresholds.minGpsCompliancePct,
+                      unit: '%',
+                      direction: 'min',
+                      severity: gpsCompliancePct < 75 ? 'critical' : 'warning',
+                      message: `Validación GPS (${gpsCompliancePct}%) bajo el umbral mínimo (${operationalThresholds.minGpsCompliancePct}%).`,
+                    }
+                  : undefined,
             },
             {
               id: 'fichaje-ultimo',
@@ -1208,6 +1281,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               iconKey: 'check_circle',
               targetElementId: 'historial-fichajes',
               calculationFormula: `Pendientes = ${pendingPunches} fichajes sin sincronizar + ${idbPunchPending} en cola IndexedDB. Variación Coste Laboral: ${formatSignedPct(monthlyPerformanceKPIs.costeLaboral.monthlyChangePct)} vs. ${monthlyPerformanceKPIs.previousMonthLabel}.`,
+              thresholdAlert:
+                pendingPunches + idbPunchPending > operationalThresholds.maxPendingSyncCount
+                  ? {
+                      metricKey: 'maxPendingSyncCount',
+                      currentValue: pendingPunches + idbPunchPending,
+                      thresholdValue: operationalThresholds.maxPendingSyncCount,
+                      unit: ' reg.',
+                      direction: 'max',
+                      severity: 'warning',
+                      message: `Existen ${pendingPunches + idbPunchPending} fichaje(s) pendientes de sincronización (umbral máx.: ${operationalThresholds.maxPendingSyncCount}).`,
+                    }
+                  : undefined,
             },
           ];
         },
@@ -1256,6 +1341,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               iconKey: 'alert_triangle',
               targetElementId: 'alertas-gastos',
               calculationFormula: `Documentos en revisión/aprobación (${pendingApproval.length}) + envíos OCR en cola offline IndexedDB (${idbExpensePending}).`,
+              thresholdAlert:
+                pendingApproval.length + idbExpensePending > operationalThresholds.maxPendingExpensesAllowed
+                  ? {
+                      metricKey: 'maxPendingExpensesAllowed',
+                      currentValue: pendingApproval.length + idbExpensePending,
+                      thresholdValue: operationalThresholds.maxPendingExpensesAllowed,
+                      unit: ' docs',
+                      direction: 'max',
+                      severity: 'warning',
+                      message: `Facturas por aprobar (${pendingApproval.length + idbExpensePending}) superan el límite operativo (${operationalThresholds.maxPendingExpensesAllowed}).`,
+                    }
+                  : undefined,
             },
             {
               id: 'gastos-auditoria',
@@ -1266,6 +1363,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               iconKey: 'trending_up',
               drawerHub: 'plato_escandallo',
               calculationFormula: `Facturas con alerta de desviación de precio en escandallo o estado 'en_disputa' (${auditAlerts.length} de ${expenses.length}).`,
+              thresholdAlert:
+                auditAlerts.length > operationalThresholds.maxAuditAlertsAllowed
+                  ? {
+                      metricKey: 'maxAuditAlertsAllowed',
+                      currentValue: auditAlerts.length,
+                      thresholdValue: operationalThresholds.maxAuditAlertsAllowed,
+                      unit: ' alertas',
+                      direction: 'max',
+                      severity: 'critical',
+                      message: `Se han detectado ${auditAlerts.length} anomalía(s) de auditoría (máx. permitido: ${operationalThresholds.maxAuditAlertsAllowed}).`,
+                    }
+                  : undefined,
             },
             {
               id: 'gastos-iva',
@@ -1309,10 +1418,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               label: 'Comensales & Ventas Mes',
               value: `${confirmedGuests} pax`,
               subtext: `Ocupación ${occupancyPct}% · Ventas ${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)} (${formatSignedPct(monthlyPerformanceKPIs.ventas.monthlyChangePct)})`,
-              highlight: 'text-emerald-400',
+              highlight: occupancyPct < operationalThresholds.minOccupancyPct ? 'text-amber-400' : 'text-emerald-400',
               iconKey: 'users',
               targetElementId: 'libro-reservas',
               calculationFormula: `Ocupación = (${confirmedGuests} pax / ${venueCapacity} plazas) × 100 = ${occupancyPct}%. Crecimiento Ventas = ((${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)} − ${formatEur(monthlyPerformanceKPIs.ventas.previousAmount)}) / ${formatEur(monthlyPerformanceKPIs.ventas.previousAmount)}) × 100 = ${formatSignedPct(monthlyPerformanceKPIs.ventas.monthlyChangePct)}.`,
+              thresholdAlert:
+                occupancyPct < operationalThresholds.minOccupancyPct
+                  ? {
+                      metricKey: 'minOccupancyPct',
+                      currentValue: occupancyPct,
+                      thresholdValue: operationalThresholds.minOccupancyPct,
+                      unit: '%',
+                      direction: 'min',
+                      severity: 'warning',
+                      message: `Ocupación actual (${occupancyPct}%) por debajo del umbral objetivo (${operationalThresholds.minOccupancyPct}%).`,
+                    }
+                  : undefined,
             },
             {
               id: 'reservas-canal-voz',
@@ -1364,20 +1485,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               label: 'Turnos & Coste Laboral',
               value: `${totalShifts} puestos`,
               subtext: `Coste Laboral ${formatEur(monthlyPerformanceKPIs.costeLaboral.currentAmount)} (${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}% s/ ventas)`,
-              highlight: 'text-indigo-300',
+              highlight:
+                (monthlyPerformanceKPIs.costeLaboral.ratioPct ?? 0) > operationalThresholds.maxLaborCostRatioPct
+                  ? 'text-amber-400'
+                  : 'text-indigo-300',
               iconKey: 'calendar',
               targetElementId: 'nuevo-turno',
               calculationFormula: `Ratio Coste Laboral = (${formatEur(monthlyPerformanceKPIs.costeLaboral.currentAmount)} / ${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)}) × 100 = ${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}%, ajustado en vivo por horas de ${totalShifts} turnos y fichajes.`,
+              thresholdAlert: monthlyPerformanceKPIs.costeLaboral.thresholdAlert,
             },
             {
               id: 'rrhh-confirmados',
               label: 'Turnos Confirmados',
               value: `${confirmedShifts}/${totalShifts} (${coveragePct}%)`,
               subtext: pendingShifts > 0 ? `${pendingShifts} pendiente(s) de confirmar` : 'Todo el equipo confirmado',
-              highlight: pendingShifts === 0 ? 'text-emerald-400' : 'text-amber-400',
+              highlight: coveragePct >= operationalThresholds.minShiftCoveragePct ? 'text-emerald-400' : 'text-amber-400',
               iconKey: 'check_circle',
               targetElementId: 'nuevo-turno',
               calculationFormula: `Cobertura = (${confirmedShifts} turnos confirmados / ${totalShifts} turnos totales) × 100 = ${coveragePct}%.`,
+              thresholdAlert:
+                coveragePct < operationalThresholds.minShiftCoveragePct
+                  ? {
+                      metricKey: 'minShiftCoveragePct',
+                      currentValue: coveragePct,
+                      thresholdValue: operationalThresholds.minShiftCoveragePct,
+                      unit: '%',
+                      direction: 'min',
+                      severity: coveragePct < 50 ? 'critical' : 'warning',
+                      message: `Cobertura de turnos confirmados (${coveragePct}%) por debajo del umbral (${operationalThresholds.minShiftCoveragePct}%).`,
+                    }
+                  : undefined,
             },
             {
               id: 'rrhh-vacaciones',
@@ -1442,6 +1579,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               iconKey: 'trending_up',
               targetElementId: 'conciliacion-bancaria',
               calculationFormula: `Importe de ${pendingExpenses.length} documentos sin visto bueno (${formatEur(pendingAmount)}). Margen tras personal = 100% − ${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}% = ${monthlyPerformanceKPIs.netMarginAfterLaborPct.toFixed(1)}%.`,
+              thresholdAlert:
+                monthlyPerformanceKPIs.netMarginAfterLaborPct < operationalThresholds.minNetMarginAfterLaborPct
+                  ? {
+                      metricKey: 'minNetMarginAfterLaborPct',
+                      currentValue: monthlyPerformanceKPIs.netMarginAfterLaborPct,
+                      thresholdValue: operationalThresholds.minNetMarginAfterLaborPct,
+                      unit: '%',
+                      direction: 'min',
+                      severity: 'warning',
+                      message: `Margen tras personal (${monthlyPerformanceKPIs.netMarginAfterLaborPct.toFixed(1)}%) por debajo del mínimo (${operationalThresholds.minNetMarginAfterLaborPct.toFixed(1)}%).`,
+                    }
+                  : undefined,
             },
             {
               id: 'eco-alertas',
@@ -1455,16 +1604,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               iconKey: 'alert_triangle',
               targetElementId: 'prevision-liquidez',
               calculationFormula: `${alertExpenses.length} documento(s) con alerta de auditoría o disputa por valor de ${formatEur(alertExposure)}. Ratio Coste Laboral = ${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}% (${formatSignedPct(monthlyPerformanceKPIs.costeLaboral.ratioDeltaPts ?? 0).replace('%', ' p.p.')}).`,
+              thresholdAlert:
+                alertExpenses.length > operationalThresholds.maxAuditAlertsAllowed
+                  ? {
+                      metricKey: 'maxAuditAlertsAllowed',
+                      currentValue: alertExpenses.length,
+                      thresholdValue: operationalThresholds.maxAuditAlertsAllowed,
+                      unit: ' alertas',
+                      direction: 'max',
+                      severity: 'critical',
+                      message: `Alertas activas de tesorería (${alertExpenses.length}) requieren revisión (umbral: ${operationalThresholds.maxAuditAlertsAllowed}).`,
+                    }
+                  : undefined,
             },
             {
               id: 'eco-sync',
               label: 'Sincronización Contable',
               value: `${syncedPct}% Cuadrado`,
               subtext: `${syncedCount}/${expenses.length} registros en central`,
-              highlight: syncedPct === 100 ? 'text-emerald-400' : 'text-amber-400',
+              highlight: syncedPct >= operationalThresholds.minAccountingSyncPct ? 'text-emerald-400' : 'text-amber-400',
               iconKey: 'check_circle',
               targetElementId: 'conciliacion-bancaria',
               calculationFormula: `% Cuadrado = (${syncedCount} documentos sincronizados / ${expenses.length} documentos totales) × 100 = ${syncedPct}%.`,
+              thresholdAlert:
+                syncedPct < operationalThresholds.minAccountingSyncPct
+                  ? {
+                      metricKey: 'minAccountingSyncPct',
+                      currentValue: syncedPct,
+                      thresholdValue: operationalThresholds.minAccountingSyncPct,
+                      unit: '%',
+                      direction: 'min',
+                      severity: 'warning',
+                      message: `Cuadre contable (${syncedPct}%) inferior al umbral mínimo (${operationalThresholds.minAccountingSyncPct}%).`,
+                    }
+                  : undefined,
             },
           ];
         },
@@ -1491,6 +1664,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               iconKey: 'zap',
               targetElementId: 'cola-transacciones',
               calculationFormula: `Pendientes totales = ${queuePending} operaciones en cola local + ${idbPendingSubmissions.length} formularios diferidos en IndexedDB.`,
+              thresholdAlert:
+                pendingSyncCount > operationalThresholds.maxPendingSyncCount
+                  ? {
+                      metricKey: 'maxPendingSyncCount',
+                      currentValue: pendingSyncCount,
+                      thresholdValue: operationalThresholds.maxPendingSyncCount,
+                      unit: ' ops',
+                      direction: 'max',
+                      severity: 'warning',
+                      message: `${pendingSyncCount} operación(es) pendiente(s) superan el umbral (${operationalThresholds.maxPendingSyncCount}).`,
+                    }
+                  : undefined,
             },
             {
               id: 'sync-conectividad',
@@ -1503,6 +1688,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               iconKey: effectiveOnline ? 'wifi' : 'wifi_off',
               targetElementId: 'cola-transacciones',
               calculationFormula: `Estado combinado de red del navegador + simulador offline, junto a ${activeDraftsCount} borrador(es) con cambios sin enviar.`,
+              thresholdAlert: !effectiveOnline
+                ? {
+                    metricKey: 'connectivity',
+                    currentValue: 0,
+                    thresholdValue: 1,
+                    unit: '',
+                    direction: 'min',
+                    severity: 'warning',
+                    message: 'Dispositivo operando sin conexión; cola diferida en IndexedDB.',
+                  }
+                : undefined,
             },
             {
               id: 'sync-conflictos',
@@ -1516,6 +1712,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               iconKey: unresolvedConflicts > 0 ? 'alert_triangle' : 'shield_check',
               targetElementId: 'cola-transacciones',
               calculationFormula: `Conteo de colisiones de edición local vs. servidor pendientes de resolución manual (${unresolvedConflicts}).`,
+              thresholdAlert:
+                unresolvedConflicts > operationalThresholds.maxUnresolvedConflicts
+                  ? {
+                      metricKey: 'maxUnresolvedConflicts',
+                      currentValue: unresolvedConflicts,
+                      thresholdValue: operationalThresholds.maxUnresolvedConflicts,
+                      unit: ' conf.',
+                      direction: 'max',
+                      severity: 'critical',
+                      message: `Conflictos sin resolver (${unresolvedConflicts}) superan el máximo permitido (${operationalThresholds.maxUnresolvedConflicts}).`,
+                    }
+                  : undefined,
             },
             {
               id: 'sync-sincronizados',
@@ -1549,6 +1757,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       pendingSyncCount,
       effectiveOnline,
       monthlyPerformanceKPIs,
+      operationalThresholds,
     ]
   );
 
@@ -1667,6 +1876,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getAllOperativaModuleKPIs,
         currentOperativaKPIs,
         monthlyPerformanceKPIs,
+        operationalThresholds,
+        updateOperationalThresholds,
         syncQueue,
         syncConflicts,
         idbDrafts,

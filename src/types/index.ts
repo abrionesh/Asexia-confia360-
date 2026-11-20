@@ -200,6 +200,31 @@ export type OperativaKPIIconKey =
   | 'wifi'
   | 'wifi_off';
 
+export interface OperationalThresholdAlert {
+  metricKey: string;
+  currentValue: number;
+  thresholdValue: number;
+  unit: string;
+  direction: 'min' | 'max';
+  severity: 'warning' | 'critical';
+  message: string;
+}
+
+export interface OperationalThresholdsConfig {
+  minGpsCompliancePct: number;
+  minActiveEmployeesPunched: number;
+  maxAuditAlertsAllowed: number;
+  maxPendingExpensesAllowed: number;
+  minOccupancyPct: number;
+  minShiftCoveragePct: number;
+  minAccountingSyncPct: number;
+  maxPendingSyncCount: number;
+  maxUnresolvedConflicts: number;
+  minSalesMonthlyChangePct: number;
+  maxLaborCostRatioPct: number;
+  minNetMarginAfterLaborPct: number;
+}
+
 export interface OperativaModuleKPI {
   id: string;
   label: string;
@@ -211,6 +236,7 @@ export interface OperativaModuleKPI {
   drawerHub?: EntityHubType;
   isRolePriority?: boolean;
   calculationFormula?: string;
+  thresholdAlert?: OperationalThresholdAlert;
 }
 
 export interface MonthlyPerformanceKPI {
@@ -225,6 +251,7 @@ export interface MonthlyPerformanceKPI {
   isFavorable: boolean;
   targetHint: string;
   driverSummary: string;
+  thresholdAlert?: OperationalThresholdAlert;
 }
 
 export interface DailyPerformancePoint {
