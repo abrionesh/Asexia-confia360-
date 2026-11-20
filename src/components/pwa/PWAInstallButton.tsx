@@ -5,6 +5,7 @@ import { Download, Smartphone } from 'lucide-react';
 export const PWAInstallButton: React.FC = () => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [showDesktopGuide, setShowDesktopGuide] = useState(false);
 
   // If already running as an installed standalone PWA, hide or show subtle status
   if (isInstalled) {
@@ -75,13 +76,43 @@ export const PWAInstallButton: React.FC = () => {
 
   // Ambient helper button on browser desktop/simulator
   return (
-    <button
-      onClick={() => alert('Para instalar AsexIA Confia360 en tu móvil o navegador, utiliza la opción "Instalar aplicación" desde el menú del navegador o accede desde un dispositivo móvil Android/iOS.')}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-white transition"
-      title="AsexIA Confia360 es una PWA compatible offline"
-    >
-      <Download className="w-3.5 h-3.5 text-[#0067B9]" />
-      <span>PWA Lista</span>
-    </button>
+    <>
+      <button
+        onClick={() => setShowDesktopGuide(true)}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-white transition"
+        title="AsexIA Confia360 es una PWA compatible offline"
+      >
+        <Download className="w-3.5 h-3.5 text-[#0067B9]" />
+        <span>PWA Lista</span>
+      </button>
+
+      {showDesktopGuide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#022853] flex items-center justify-center text-white font-black text-lg">
+                A
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[#022853]">Instalar AsexIA Confia360</h3>
+                <p className="text-xs text-slate-500">Aplicación Web Progresiva Offline-First</p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-2 text-xs text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <p>1. En Chrome o Edge, pulsa el icono de instalación en la barra de direcciones o abre el menú del navegador.</p>
+              <p>2. Selecciona <strong>Instalar aplicación</strong> para fijar <strong>Confia360</strong> en tu escritorio o móvil.</p>
+              <p>3. Tus formularios y borradores seguirán disponibles incluso sin conexión.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDesktopGuide(false)}
+              className="mt-5 w-full rounded-xl bg-[#022853] py-2.5 text-xs font-bold text-white hover:bg-[#0067B9] transition"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 };

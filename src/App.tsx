@@ -15,6 +15,7 @@ import { CockpitDashboard } from './components/cockpit/CockpitDashboard';
 import { NavigationBackButton } from './components/NavigationBackButton';
 import { QuickStartTour } from './components/pwa/QuickStartTour';
 import { TourCompletionBanner } from './components/pwa/TourCompletionBanner';
+import { PWAUpdatePrompt } from './components/pwa/PWAUpdatePrompt';
 import { PositionalHelpFloatingBar } from './components/help/PositionalHelpFloatingBar';
 import { ReputationModule } from './components/reputation/ReputationModule';
 import { UniversalDrawer360 } from './components/navigation360/UniversalDrawer360';
@@ -85,6 +86,9 @@ const AppContent: React.FC = () => {
 
         {/* WhatsApp-Style Voice & Text Floating Assistant */}
         <WhatsAppVoiceAssistant />
+
+        {/* PWA Service Worker Update & Offline-Ready Prompt */}
+        <PWAUpdatePrompt />
 
         {/* ========================================================= */}
         {/* VIEW: INICIO Y CATÁLOGO DE MÓDULOS ACTIVOS / DISPONIBLES   */}

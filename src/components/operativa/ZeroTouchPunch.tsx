@@ -1,13 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { SyncStatusIndicator } from '../SyncQueueDrawer';
-import { MapPin, CheckCircle, Navigation, ShieldCheck, History, Clock } from 'lucide-react';
+import { useIndexedDbFormState } from '../../hooks/useIndexedDbFormState';
+import { MapPin, CheckCircle, Navigation, History, Clock, RefreshCw, X } from 'lucide-react';
 import { PositionalHelpBeacon } from '../help/PositionalHelpBeacon';
 
+interface PunchDraftState extends Record<string, unknown> {
+  note: string;
+  punchId?: string;
+  punchType?: 'entrada' | 'salida' | 'pausa';
+}
+
+const INITIAL_PUNCH_DRAFT: PunchDraftState = {
+  note: '',
+};
+
 export const ZeroTouchPunch: React.FC = () => {
-  const { punches, recordPunch, isOnline, brandConfig } = useApp();
+  const { punches, recordPunch, isOnline, brandConfig, triggerManualSync } = useApp();
   const [loading, setLoading] = useState(false);
   const [lastActionSuccess, setLastActionSuccess] = useState<string | null>(null);
+
+  const syncPendingPunch = useCallback(async () => {
+    await triggerManualSync();
+  }, [triggerManualSync]);
+
+  const {
+    formState: draft,
+    updateField,
+    hasRecoveredDraft,
+    dismissRecoveredNotice,
+    pendingSubmissionsCount,
+    isSyncingPending,
+    queueSubmission,
+    flushPendingSubmissions,
+    clearDraft,
+  } = useIndexedDbFormState<PunchDraftState>({
+    formId: 'operativa_fichaje_cero_toque',
+    module: 'fichaje',
+    initialState: INITIAL_PUNCH_DRAFT,
+    isOnline,
+    onSyncPending: syncPendingPunch,
+    isDraftDirty: (state) => state.note.trim().length > 0,
+  });
 
   // Check today's active punch state
   const latestPunch = punches[0];
@@ -17,7 +51,17 @@ export const ZeroTouchPunch: React.FC = () => {
     setLoading(true);
     setLastActionSuccess(null);
     try {
+      const noteSnapshot = draft.note.trim();
       const res = await recordPunch(type);
+      if (!isOnline) {
+        await queueSubmission({
+          note: noteSnapshot,
+          punchId: res.punch.id,
+          punchType: type,
+        });
+      } else if (noteSnapshot) {
+        await clearDraft();
+      }
       setLastActionSuccess(res.message);
       setTimeout(() => setLastActionSuccess(null), 4500);
     } finally {
@@ -63,6 +107,68 @@ export const ZeroTouchPunch: React.FC = () => {
             <span className="text-slate-500 text-[11px]">Radio de tolerancia: 150m</span>
           </div>
         </div>
+      </div>
+
+      {/* IndexedDB Shift Note & Offline Backup Banner */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <label htmlFor="fichaje-note-input" className="text-xs font-bold text-[#022853] whitespace-nowrap">
+            Nota de turno / incidencia (persistida en IndexedDB):
+          </label>
+          <input
+            id="fichaje-note-input"
+            type="text"
+            value={draft.note}
+            onChange={(e) => updateField('note', e.target.value)}
+            placeholder="Ej. Apertura de terraza, descarga de proveedor o cambio de turno..."
+            className="flex-1 text-xs px-3 py-2 rounded-xl border border-slate-300 focus:border-[#0067B9] focus:ring-2 focus:ring-[#0067B9]/20"
+          />
+        </div>
+
+        {(hasRecoveredDraft || pendingSubmissionsCount > 0) && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            {hasRecoveredDraft && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-[#022853]">
+                <Clock className="w-3.5 h-3.5 text-[#0067B9] shrink-0" />
+                <span>Nota de fichaje recuperada desde IndexedDB.</span>
+                <button
+                  type="button"
+                  onClick={() => clearDraft()}
+                  className="font-bold text-rose-700 hover:underline"
+                >
+                  Limpiar
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissRecoveredNotice}
+                  className="text-slate-400 hover:text-slate-700"
+                  aria-label="Ocultar aviso"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {pendingSubmissionsCount > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">
+                <RefreshCw className={`w-3.5 h-3.5 text-amber-700 shrink-0 ${isSyncingPending ? 'animate-spin' : ''}`} />
+                <span>
+                  <strong>{pendingSubmissionsCount}</strong>{' '}
+                  {pendingSubmissionsCount === 1 ? 'fichaje pendiente' : 'fichajes pendientes'} en IndexedDB
+                </span>
+                {isOnline && !isSyncingPending && (
+                  <button
+                    type="button"
+                    onClick={() => flushPendingSubmissions()}
+                    className="px-2 py-0.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition"
+                  >
+                    Sincronizar
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Success Notification Alert */}
@@ -167,7 +273,7 @@ export const ZeroTouchPunch: React.FC = () => {
       </div>
 
       {/* Punch History with Universal Visual States */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+      <div id="historial-fichajes" className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs scroll-mt-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-[#0067B9]" />

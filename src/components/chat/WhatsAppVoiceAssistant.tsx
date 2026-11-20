@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useIndexedDbFormState } from '../../hooks/useIndexedDbFormState';
 import { USER_ROLES } from '../../types/userProfile';
 import { ChatCommunication, INITIAL_WHATSAPP_MESSAGES } from '../../types/chatCommunication';
 import {
@@ -49,6 +50,7 @@ export const WhatsAppVoiceAssistant: React.FC = () => {
     setIsReportModalOpen,
     setIsIdentityModalOpen,
     announceAriaLive,
+    isOnline,
     isVoiceAssistantOpen,
     setIsVoiceAssistantOpen,
     closeVoiceAssistant,
@@ -98,8 +100,23 @@ export const WhatsAppVoiceAssistant: React.FC = () => {
     });
   };
 
-  // Input & Voice Recording State
-  const [inputText, setInputText] = useState('');
+  // Input & Voice Recording State (inputText persisted in IndexedDB while offline)
+  const {
+    formState: assistantDraft,
+    updateField: updateAssistantDraftField,
+    clearDraft: clearAssistantDraft,
+  } = useIndexedDbFormState<{ inputText: string }>({
+    formId: 'operativa_asistente_flotante',
+    module: 'rrhh_turnos',
+    initialState: { inputText: '' },
+    isOnline,
+    isDraftDirty: (state) => state.inputText.trim().length > 0,
+  });
+
+  const inputText = assistantDraft.inputText;
+  const setInputText = (val: string) => updateAssistantDraftField('inputText', val);
+
+  const [confirmClearHistory, setConfirmClearHistory] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -720,17 +737,22 @@ export const WhatsAppVoiceAssistant: React.FC = () => {
     activeAudioStopRef.current = stopFn;
   };
 
-  // Clear chat communications history
-  const handleClearHistory = () => {
-    if (window.confirm('¿Deseas vaciar el historial de comunicaciones con el Asistente?')) {
-      const reset = INITIAL_WHATSAPP_MESSAGES;
-      setMessages(reset);
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(reset));
-      } catch {
-        // ignore
-      }
+  // Clear chat communications history (inline confirmation without window.confirm)
+  const handleClearHistory = async () => {
+    if (!confirmClearHistory) {
+      setConfirmClearHistory(true);
+      return;
     }
+    const reset = INITIAL_WHATSAPP_MESSAGES;
+    setMessages(reset);
+    setConfirmClearHistory(false);
+    await clearAssistantDraft();
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(reset));
+    } catch {
+      // ignore
+    }
+    announceAriaLive('Historial de comunicaciones vaciado.');
   };
 
   // Quick Action Chips tailored for active role
@@ -912,15 +934,34 @@ export const WhatsAppVoiceAssistant: React.FC = () => {
                 {isTtsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </button>
 
-              {/* Clear History */}
-              <button
-                onClick={handleClearHistory}
-                className="p-2 text-emerald-200/60 hover:text-rose-300 rounded-xl transition"
-                title="Vaciar historial de comunicaciones"
-                aria-label="Vaciar historial"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {/* Clear History (2-step inline confirmation) */}
+              {confirmClearHistory ? (
+                <div className="flex items-center gap-1 bg-rose-900/60 px-1.5 py-1 rounded-xl border border-rose-400/40">
+                  <button
+                    type="button"
+                    onClick={handleClearHistory}
+                    className="text-[10px] font-bold text-white bg-rose-600 hover:bg-rose-700 px-2 py-0.5 rounded-lg transition"
+                  >
+                    Borrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClearHistory(false)}
+                    className="text-[10px] font-semibold text-emerald-100 hover:text-white px-1"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleClearHistory}
+                  className="p-2 text-emerald-200/60 hover:text-rose-300 rounded-xl transition"
+                  title="Vaciar historial de comunicaciones"
+                  aria-label="Vaciar historial"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
 
               {/* Minimize / Close */}
               <button

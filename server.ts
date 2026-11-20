@@ -3,10 +3,17 @@ import http from 'http';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { WebSocketServer, WebSocket } from 'ws';
 
 dotenv.config();
+
+const __filename =
+  typeof import.meta.url === 'string' && import.meta.url.startsWith('file:')
+    ? fileURLToPath(import.meta.url)
+    : path.resolve(process.cwd(), 'server.ts');
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -561,10 +568,12 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const cwdDist = path.resolve(process.cwd(), 'dist');
-    const distPath = fs.existsSync(cwdDist)
-      ? cwdDist
-      : path.resolve(path.dirname(process.argv[1] || process.cwd()), '..', 'dist');
+    const distCandidates = [
+      path.resolve(__dirname, '..', 'dist'),
+      path.resolve(__dirname, 'dist'),
+      path.resolve(process.cwd(), 'dist'),
+    ];
+    const distPath = distCandidates.find((candidate) => fs.existsSync(candidate)) || distCandidates[0];
 
     // Return clean JSON 404 for unknown API endpoints instead of SPA HTML
     app.all('/api/*', (req, res) => {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { SyncStatusIndicator } from '../SyncQueueDrawer';
 import {
@@ -13,11 +13,19 @@ import {
 } from 'lucide-react';
 
 export const EconomicAgentPanel: React.FC = () => {
-  const { expenses, approveExpenseTicket, brandConfig } = useApp();
+  const { expenses, approveExpenseTicket, updateExpenseTicket, announceAriaLive } = useApp();
+  const [claimedNotice, setClaimedNotice] = useState<string | null>(null);
 
   const totalMonthlySpend = expenses.reduce((acc, curr) => acc + curr.totalAmount, 0);
-  const pendingApprovalCount = expenses.filter((e) => e.status !== 'approved').length;
+  const pendingApprovalCount = expenses.filter((e) => e.status !== 'approved' && e.status !== 'aprobada').length;
   const duplicateAlerts = expenses.filter((e) => e.auditAlert);
+
+  const handleOpenClaim = (id: string, providerName: string) => {
+    updateExpenseTicket(id, { status: 'en_disputa' });
+    const msg = `Incidencia abierta para revisión y reclamación con ${providerName}.`;
+    setClaimedNotice(msg);
+    announceAriaLive(msg);
+  };
 
   return (
     <div className="space-y-6">
@@ -56,6 +64,19 @@ export const EconomicAgentPanel: React.FC = () => {
             <span>Alertas de Auditoría Contable Emitidas por el Agente Económico</span>
           </div>
           
+          {claimedNotice && (
+            <div className="p-3 rounded-xl bg-white border border-amber-300 text-xs font-semibold text-amber-900 flex items-center justify-between gap-2">
+              <span>{claimedNotice}</span>
+              <button
+                type="button"
+                onClick={() => setClaimedNotice(null)}
+                className="text-amber-700 hover:underline font-bold"
+              >
+                Cerrar
+              </button>
+            </div>
+          )}
+
           <div className="space-y-2">
             {duplicateAlerts.map((d) => (
               <div key={d.id} className="p-3 bg-white rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -71,7 +92,7 @@ export const EconomicAgentPanel: React.FC = () => {
                     Confirmar Factura
                   </button>
                   <button
-                    onClick={() => alert(`Incidencia abierta para revisión con el proveedor ${d.providerName}.`)}
+                    onClick={() => handleOpenClaim(d.id, d.providerName)}
                     className="px-3 py-1.5 rounded-lg border border-amber-400 text-amber-900 hover:bg-amber-100 font-bold text-xs transition"
                   >
                     Reclamar a Proveedor
@@ -84,7 +105,7 @@ export const EconomicAgentPanel: React.FC = () => {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div id="prevision-liquidez" className="grid grid-cols-1 sm:grid-cols-3 gap-4 scroll-mt-6">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-1">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tickets por Revisar</span>
           <div className="text-2xl font-black text-[#022853]">{pendingApprovalCount}</div>
@@ -105,7 +126,7 @@ export const EconomicAgentPanel: React.FC = () => {
       </div>
 
       {/* Detailed Expense Audit Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+      <div id="conciliacion-bancaria" className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs scroll-mt-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <FileSpreadsheet className="w-4 h-4 text-[#0067B9]" />

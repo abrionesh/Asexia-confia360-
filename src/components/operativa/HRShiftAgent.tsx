@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ApiService } from '../../services/api';
+import { useIndexedDbFormState } from '../../hooks/useIndexedDbFormState';
 import {
   Calendar,
   Clock,
@@ -12,30 +13,145 @@ import {
   Palmtree,
   UserCheck,
   Building,
+  RefreshCw,
+  X,
 } from 'lucide-react';
 import { EmployeeShift } from '../../types';
 
-export const HRShiftAgent: React.FC = () => {
-  const { shifts, confirmEmployeeShift, announceAriaLive, addAgentInteraction } = useApp();
+interface HRChatMessage {
+  sender: 'agent' | 'user';
+  text: string;
+  time: string;
+  actionCard?: any;
+  fromOfflineFallback?: boolean;
+}
 
-  const [chatMessages, setChatMessages] = useState<
-    { sender: 'agent' | 'user'; text: string; time: string; actionCard?: any }[]
-  >([
-    {
-      sender: 'agent',
-      text: '¡Hola Carlos! Soy tu asistente de RRHH y Turnos en AsexIA Confia360. Tienes un turno asignado mañana en el restaurante a las 10:00. ¿Deseas confirmarlo?',
-      time: '09:00',
-      actionCard: {
-        type: 'confirm_shift',
-        title: 'Turno de Mañana: 10:00 - 16:30',
-        subtitle: 'Restaurante Puerta del Sol (Sala)',
-      },
+interface HRChatDraftState extends Record<string, unknown> {
+  chatMessages: HRChatMessage[];
+  inputMessage: string;
+  vacationDays: number;
+}
+
+interface HRPendingSyncPayload extends Record<string, unknown> {
+  message: string;
+  vacationDaysSnapshot: number;
+  createdTime: string;
+}
+
+const INITIAL_HR_CHAT_MESSAGES: HRChatMessage[] = [
+  {
+    sender: 'agent',
+    text: '¡Hola Carlos! Soy tu asistente de RRHH y Turnos en AsexIA Confia360. Tienes un turno asignado mañana en el restaurante a las 10:00. ¿Deseas confirmarlo?',
+    time: '09:00',
+    actionCard: {
+      type: 'confirm_shift',
+      title: 'Turno de Mañana: 10:00 - 16:30',
+      subtitle: 'Restaurante Puerta del Sol (Sala)',
     },
-  ]);
+  },
+];
 
-  const [inputMessage, setInputMessage] = useState('');
+const INITIAL_HR_DRAFT: HRChatDraftState = {
+  chatMessages: INITIAL_HR_CHAT_MESSAGES,
+  inputMessage: '',
+  vacationDays: 14,
+};
+
+const INITIAL_HR_PENDING: HRPendingSyncPayload = {
+  message: '',
+  vacationDaysSnapshot: 14,
+  createdTime: '',
+};
+
+export const HRShiftAgent: React.FC = () => {
+  const { shifts, confirmEmployeeShift, isOnline, announceAriaLive, addAgentInteraction } = useApp();
+
   const [isTyping, setIsTyping] = useState(false);
-  const [vacationDays, setVacationDays] = useState(14);
+
+  const {
+    formState: draft,
+    setFormState: setDraft,
+    updateField,
+    hasRecoveredDraft,
+    dismissRecoveredNotice,
+    clearDraft,
+  } = useIndexedDbFormState<HRChatDraftState>({
+    formId: 'operativa_rrhh_chat',
+    module: 'rrhh_turnos',
+    initialState: INITIAL_HR_DRAFT,
+    isOnline,
+    isDraftDirty: (state) =>
+      state.inputMessage.trim().length > 0 ||
+      state.chatMessages.length > 1 ||
+      state.vacationDays !== 14,
+  });
+
+  const { chatMessages, inputMessage, vacationDays } = draft;
+  const setInputMessage = (val: string) => updateField('inputMessage', val);
+
+  const syncPendingHRRequest = useCallback(
+    async (payload: HRPendingSyncPayload) => {
+      if (!payload.message.trim()) return;
+      const response = await ApiService.processHRAssistant({
+        message: payload.message,
+        employeeContext: {
+          name: 'Carlos Ruiz',
+          role: 'Camarero / Sala',
+          vacationDaysLeft: payload.vacationDaysSnapshot,
+          nextShift: {
+            date: 'Mañana (11 de Octubre)',
+            time: '10:00 - 16:30',
+            location: 'Restaurante Puerta del Sol',
+          },
+        },
+      });
+
+      if (response.fromOfflineFallback) {
+        throw new Error('La solicitud RRHH sigue sin conectividad directa con la central.');
+      }
+
+      addAgentInteraction({
+        agentType: 'chat_shifts',
+        interactionData: JSON.stringify({
+          userPrompt: payload.message,
+          response,
+          syncedFromIndexedDb: true,
+        }),
+        userId: 'emp-101',
+        moduleRef: 'shifts',
+        status: 'completed',
+      });
+
+      setDraft((prev) => ({
+        ...prev,
+        chatMessages: [
+          ...prev.chatMessages,
+          {
+            sender: 'agent',
+            text: `Solicitud sincronizada con central: ${response.replyMessage}`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            actionCard: response.actionPayload,
+            fromOfflineFallback: false,
+          },
+        ],
+      }));
+    },
+    [addAgentInteraction, setDraft]
+  );
+
+  const {
+    pendingSubmissionsCount,
+    isSyncingPending,
+    queueSubmission,
+    flushPendingSubmissions,
+  } = useIndexedDbFormState<HRPendingSyncPayload>({
+    formId: 'operativa_rrhh_pending_sync',
+    module: 'rrhh_turnos',
+    initialState: INITIAL_HR_PENDING,
+    isOnline,
+    onSyncPending: syncPendingHRRequest,
+    isDraftDirty: () => false,
+  });
 
   // Quick preset queries for employees
   const employeePresets = [
@@ -49,8 +165,11 @@ export const HRShiftAgent: React.FC = () => {
     if (!textToSend.trim()) return;
 
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setChatMessages((prev) => [...prev, { sender: 'user', text: textToSend, time }]);
-    setInputMessage('');
+    setDraft((prev) => ({
+      ...prev,
+      chatMessages: [...prev.chatMessages, { sender: 'user', text: textToSend, time }],
+      inputMessage: '',
+    }));
     setIsTyping(true);
 
     try {
@@ -68,29 +187,43 @@ export const HRShiftAgent: React.FC = () => {
         },
       });
 
-      if (response.actionType === 'vacation_draft' && response.actionPayload?.daysCount) {
-        setVacationDays((prev) => Math.max(0, prev - (response.actionPayload?.daysCount || 0)));
-      }
+      const daysToDeduct =
+        response.actionType === 'vacation_draft' && response.actionPayload?.daysCount
+          ? response.actionPayload.daysCount
+          : 0;
 
-      setChatMessages((prev) => [
+      setDraft((prev) => ({
         ...prev,
-        {
-          sender: 'agent',
-          text: response.replyMessage,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          actionCard: response.actionPayload,
-        },
-      ]);
+        vacationDays: Math.max(0, prev.vacationDays - daysToDeduct),
+        chatMessages: [
+          ...prev.chatMessages,
+          {
+            sender: 'agent',
+            text: response.replyMessage,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            actionCard: response.actionPayload,
+            fromOfflineFallback: response.fromOfflineFallback,
+          },
+        ],
+      }));
 
       announceAriaLive(response.replyMessage);
 
-      addAgentInteraction({
-        agentType: 'chat_shifts',
-        interactionData: JSON.stringify({ userPrompt: textToSend, response }),
-        userId: 'emp-101',
-        moduleRef: 'shifts',
-        status: 'completed',
-      });
+      if (!isOnline || response.fromOfflineFallback) {
+        await queueSubmission({
+          message: textToSend,
+          vacationDaysSnapshot: vacationDays,
+          createdTime: time,
+        });
+      } else {
+        addAgentInteraction({
+          agentType: 'chat_shifts',
+          interactionData: JSON.stringify({ userPrompt: textToSend, response }),
+          userId: 'emp-101',
+          moduleRef: 'shifts',
+          status: 'completed',
+        });
+      }
     } finally {
       setIsTyping(false);
     }
@@ -124,6 +257,52 @@ export const HRShiftAgent: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* IndexedDB Offline Draft & Pending Sync Notices */}
+      {(hasRecoveredDraft || pendingSubmissionsCount > 0) && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          {hasRecoveredDraft && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-[#022853]">
+              <Clock className="w-4 h-4 text-[#0067B9] shrink-0" />
+              <span>Conversación y borrador de RRHH recuperados desde IndexedDB.</span>
+              <button
+                type="button"
+                onClick={() => clearDraft()}
+                className="ml-1 font-bold text-rose-700 hover:underline"
+              >
+                Reiniciar
+              </button>
+              <button
+                type="button"
+                onClick={dismissRecoveredNotice}
+                className="text-slate-400 hover:text-slate-700"
+                aria-label="Ocultar aviso"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {pendingSubmissionsCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">
+              <RefreshCw className={`w-4 h-4 text-amber-700 shrink-0 ${isSyncingPending ? 'animate-spin' : ''}`} />
+              <span>
+                <strong>{pendingSubmissionsCount}</strong>{' '}
+                {pendingSubmissionsCount === 1 ? 'solicitud RRHH pendiente' : 'solicitudes RRHH pendientes'} en IndexedDB
+              </span>
+              {isOnline && !isSyncingPending && (
+                <button
+                  type="button"
+                  onClick={() => flushPendingSubmissions()}
+                  className="ml-1 px-2 py-0.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition"
+                >
+                  Sincronizar
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -159,8 +338,21 @@ export const HRShiftAgent: React.FC = () => {
                       : 'bg-slate-100 text-slate-800 rounded-bl-xs border border-slate-200'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2 text-[10px] opacity-75 font-semibold">
-                    <span>{msg.sender === 'user' ? 'Carlos Ruiz' : '🤖 Asistente RRHH'}</span>
+                  <div className="flex items-center justify-between gap-2 text-[10px] opacity-80 font-semibold">
+                    <span className="flex items-center gap-1.5">
+                      <span>{msg.sender === 'user' ? 'Carlos Ruiz' : '🤖 Asistente RRHH'}</span>
+                      {msg.sender === 'agent' && msg.fromOfflineFallback !== undefined && (
+                        <span
+                          className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                            msg.fromOfflineFallback
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          }`}
+                        >
+                          {msg.fromOfflineFallback ? 'Respaldo Local' : 'IA Central'}
+                        </span>
+                      )}
+                    </span>
                     <span>{msg.time}</span>
                   </div>
                   <p className="leading-relaxed">{msg.text}</p>
@@ -247,7 +439,7 @@ export const HRShiftAgent: React.FC = () => {
         </div>
 
         {/* Right: Shifts Schedule & Team Calendar (5 cols) */}
-        <div className="lg:col-span-5 space-y-4">
+        <div id="nuevo-turno" className="lg:col-span-5 space-y-4 scroll-mt-6">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold font-brand uppercase tracking-wider text-[#022853]">

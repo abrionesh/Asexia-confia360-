@@ -27,6 +27,7 @@ export interface ReservationVoiceResponse {
   transferToHuman: boolean;
   alternativeTimes: string[];
   confidenceScore: number;
+  fromOfflineFallback?: boolean;
 }
 
 export interface HRAssistantRequest {
@@ -52,6 +53,7 @@ export interface HRAssistantResponse {
     status: 'pending_manager_approval' | 'confirmed';
     daysCount?: number;
   } | null;
+  fromOfflineFallback?: boolean;
 }
 
 export interface EconomicOCRRequest {
@@ -70,12 +72,26 @@ export interface EconomicOCRResponse {
   suggestedCategory: string;
   auditAlert: string | null;
   requiresAttention: boolean;
+  fromOfflineFallback?: boolean;
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 9000): Promise<Response> {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export const ApiService = {
   async processReservationVoice(params: ReservationVoiceRequest): Promise<ReservationVoiceResponse> {
     try {
-      const response = await fetch('/api/gemini/reservation-voice', {
+      const response = await fetchWithTimeout('/api/gemini/reservation-voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
@@ -83,7 +99,7 @@ export const ApiService = {
       if (!response.ok) {
         throw new Error('API server error');
       }
-      return await response.json();
+      return { ...(await response.json()), fromOfflineFallback: false };
     } catch {
       // Offline fallback: client-side intelligent heuristics
       const lower = params.transcript.toLowerCase();
@@ -118,13 +134,14 @@ export const ApiService = {
         transferToHuman: isFrustrated,
         alternativeTimes: isConflict ? ['14:30', '15:30'] : [],
         confidenceScore: 0.9,
+        fromOfflineFallback: true,
       };
     }
   },
 
   async processHRAssistant(params: HRAssistantRequest): Promise<HRAssistantResponse> {
     try {
-      const response = await fetch('/api/gemini/hr-assistant', {
+      const response = await fetchWithTimeout('/api/gemini/hr-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
@@ -132,7 +149,7 @@ export const ApiService = {
       if (!response.ok) {
         throw new Error('API server error');
       }
-      return await response.json();
+      return { ...(await response.json()), fromOfflineFallback: false };
     } catch {
       const emp = params.employeeContext || {
         name: 'Carlos Ruiz',
@@ -152,6 +169,7 @@ export const ApiService = {
             status: 'pending_manager_approval',
             daysCount: 5,
           },
+          fromOfflineFallback: true,
         };
       } else if (lower.includes('fichar') || lower.includes('olvid')) {
         return {
@@ -162,6 +180,7 @@ export const ApiService = {
             details: 'Entrada manual estimada: 09:30. Motivo: Apertura de terraza urgente.',
             status: 'pending_manager_approval',
           },
+          fromOfflineFallback: true,
         };
       }
 
@@ -173,13 +192,14 @@ export const ApiService = {
           details: `${emp.nextShift.date} ${emp.nextShift.time}`,
           status: 'confirmed',
         },
+        fromOfflineFallback: true,
       };
     }
   },
 
   async processEconomicOCR(params: EconomicOCRRequest): Promise<EconomicOCRResponse> {
     try {
-      const response = await fetch('/api/gemini/economic-ocr', {
+      const response = await fetchWithTimeout('/api/gemini/economic-ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
@@ -187,7 +207,7 @@ export const ApiService = {
       if (!response.ok) {
         throw new Error('API server error');
       }
-      return await response.json();
+      return { ...(await response.json()), fromOfflineFallback: false };
     } catch {
       return {
         providerName: 'Distribuidora Horeca Central S.L.',
@@ -200,6 +220,7 @@ export const ApiService = {
         suggestedCategory: 'Materia Prima / Perecederos',
         auditAlert: null,
         requiresAttention: false,
+        fromOfflineFallback: true,
       };
     }
   },

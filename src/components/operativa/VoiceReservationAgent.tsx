@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ApiService } from '../../services/api';
 import { SyncStatusIndicator } from '../SyncQueueDrawer';
+import { useIndexedDbFormState } from '../../hooks/useIndexedDbFormState';
 import {
   Mic,
   MicOff,
@@ -16,45 +17,136 @@ import {
   AlertCircle,
   Hash,
   CheckCircle2,
+  RefreshCw,
+  X,
 } from 'lucide-react';
 import { Reservation } from '../../types';
 import { PositionalHelpBeacon } from '../help/PositionalHelpBeacon';
+
+interface VoiceCallLogEntry {
+  sender: 'agent' | 'user' | 'system';
+  text: string;
+  time: string;
+  fromOfflineFallback?: boolean;
+}
+
+interface ExtractedReservationData {
+  guests: number | null;
+  date: string | null;
+  time: string | null;
+  customerName: string | null;
+  phone: string | null;
+}
+
+interface VoiceReservationDraftState extends Record<string, unknown> {
+  transcript: string;
+  callLog: VoiceCallLogEntry[];
+  extractedData: ExtractedReservationData;
+  failCount: number;
+  isTransferredToHuman: boolean;
+  alternativeTimes: string[];
+  dtmfInput: string;
+}
+
+const INITIAL_CALL_LOG: VoiceCallLogEntry[] = [
+  {
+    sender: 'agent',
+    text: '¡Hola! Bienvenido al servicio de reservas 24/7 de AsexIA Confia360. ¿Para cuántas personas y qué día u hora desea su mesa?',
+    time: '12:00',
+  },
+];
+
+const INITIAL_VOICE_DRAFT: VoiceReservationDraftState = {
+  transcript: '',
+  callLog: INITIAL_CALL_LOG,
+  extractedData: {
+    guests: null,
+    date: null,
+    time: null,
+    customerName: null,
+    phone: null,
+  },
+  failCount: 0,
+  isTransferredToHuman: false,
+  alternativeTimes: [],
+  dtmfInput: '',
+};
 
 export const VoiceReservationAgent: React.FC = () => {
   const { reservations, createReservation, isOnline, announceAriaLive, addAgentInteraction } = useApp();
 
   const [isCalling, setIsCalling] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [callLog, setCallLog] = useState<{ sender: 'agent' | 'user' | 'system'; text: string; time: string }[]>([
-    {
-      sender: 'agent',
-      text: '¡Hola! Bienvenido al servicio de reservas 24/7 de AsexIA Confia360. ¿Para cuántas personas y qué día u hora desea su mesa?',
-      time: '12:00',
-    },
-  ]);
+  const [showDTMFKeypad, setShowDTMFKeypad] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [completedBanner, setCompletedBanner] = useState<{
+    customerName: string;
+    guests: number;
+    date: string;
+    time: string;
+    queuedOffline: boolean;
+  } | null>(null);
 
-  // Current extracted entity state
-  const [extractedData, setExtractedData] = useState<{
-    guests: number | null;
-    date: string | null;
-    time: string | null;
-    customerName: string | null;
-    phone: string | null;
-  }>({
-    guests: null,
-    date: null,
-    time: null,
-    customerName: null,
-    phone: null,
+  const syncPendingReservation = useCallback(
+    async (payload: VoiceReservationDraftState) => {
+      const { extractedData: data } = payload;
+      if (!data.guests || !data.time || !data.customerName) return;
+      await createReservation({
+        customerName: data.customerName,
+        phone: data.phone || '+34 600 000 000',
+        guests: data.guests,
+        date: data.date || '2026-10-16',
+        time: data.time,
+        tableNumber: 'Mesa asignada por Sala',
+        status: 'confirmed',
+        channel: 'voice_agent_24_7',
+        notes: 'Procesado mediante Agente NLU en un solo turno',
+      });
+    },
+    [createReservation]
+  );
+
+  const {
+    formState: draft,
+    setFormState: setDraft,
+    updateField,
+    hasRecoveredDraft,
+    dismissRecoveredNotice,
+    pendingSubmissionsCount,
+    isSyncingPending,
+    queueSubmission,
+    flushPendingSubmissions,
+    clearDraft,
+  } = useIndexedDbFormState<VoiceReservationDraftState>({
+    formId: 'operativa_reservas_voz',
+    module: 'reservas_voz',
+    initialState: INITIAL_VOICE_DRAFT,
+    isOnline,
+    onSyncPending: syncPendingReservation,
+    isDraftDirty: (state) =>
+      state.transcript.trim().length > 0 ||
+      state.dtmfInput.trim().length > 0 ||
+      state.callLog.length > 1 ||
+      state.extractedData.guests !== null ||
+      state.extractedData.date !== null ||
+      state.extractedData.time !== null ||
+      state.extractedData.customerName !== null ||
+      state.extractedData.phone !== null ||
+      state.failCount > 0 ||
+      state.isTransferredToHuman,
   });
 
-  const [failCount, setFailCount] = useState(0);
-  const [isTransferredToHuman, setIsTransferredToHuman] = useState(false);
-  const [showDTMFKeypad, setShowDTMFKeypad] = useState(false);
-  const [alternativeTimes, setAlternativeTimes] = useState<string[]>([]);
-  const [dtmfInput, setDtmfInput] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const {
+    transcript,
+    callLog,
+    extractedData,
+    failCount,
+    isTransferredToHuman,
+    alternativeTimes,
+    dtmfInput,
+  } = draft;
+
+  const setTranscript = (val: string) => updateField('transcript', val);
 
   // Quick voice simulation presets
   const presetPhrases = [
@@ -80,13 +172,17 @@ export const VoiceReservationAgent: React.FC = () => {
   };
 
   const handleStartCall = () => {
+    setCompletedBanner(null);
     setIsCalling(true);
-    setIsTransferredToHuman(false);
-    setFailCount(0);
     const greeting = '¡Hola! Bienvenido al asistente de reservas 24/7. ¿Para cuántas personas y qué fecha u hora busca mesa?';
-    setCallLog([
-      { sender: 'agent', text: greeting, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    ]);
+    setDraft((prev) => ({
+      ...prev,
+      isTransferredToHuman: false,
+      failCount: 0,
+      callLog: [
+        { sender: 'agent', text: greeting, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+      ],
+    }));
     speakText(greeting);
     announceAriaLive('Llamada telefónica iniciada con el agente inteligente de reservas.');
   };
@@ -94,12 +190,17 @@ export const VoiceReservationAgent: React.FC = () => {
   const handleProcessUserSpeech = async (userText: string) => {
     if (!userText.trim()) return;
 
+    setCompletedBanner(null);
     setIsProcessing(true);
     const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Append user turn to log
-    setCallLog((prev) => [...prev, { sender: 'user', text: userText, time: timeNow }]);
-    setTranscript('');
+    // Append user turn to log and clear transcript in IndexedDB-backed draft
+    const logAfterUser: VoiceCallLogEntry[] = [...callLog, { sender: 'user', text: userText, time: timeNow }];
+    setDraft((prev) => ({
+      ...prev,
+      callLog: [...prev.callLog, { sender: 'user', text: userText, time: timeNow }],
+      transcript: '',
+    }));
 
     try {
       const response = await ApiService.processReservationVoice({
@@ -109,30 +210,40 @@ export const VoiceReservationAgent: React.FC = () => {
       });
 
       // Update extracted entity slots
-      const merged = {
+      const merged: ExtractedReservationData = {
         guests: response.extracted.guests ?? extractedData.guests,
         date: response.extracted.date ?? extractedData.date,
         time: response.extracted.time ?? extractedData.time,
         customerName: response.extracted.customerName ?? extractedData.customerName,
         phone: response.extracted.phone ?? extractedData.phone,
       };
-      setExtractedData(merged);
-      setAlternativeTimes(response.alternativeTimes || []);
+      const nextAlternatives = response.alternativeTimes || [];
 
       if (response.transferToHuman) {
-        setIsTransferredToHuman(true);
         const transferMsg = 'Transfiriendo llamada a un encargado humano de sala. Registrando transcripción de auditoría...';
-        setCallLog((prev) => [
-          ...prev,
-          { sender: 'agent', text: response.spokenResponse, time: timeNow },
+        const updatedLog: VoiceCallLogEntry[] = [
+          ...logAfterUser,
+          {
+            sender: 'agent',
+            text: response.spokenResponse,
+            time: timeNow,
+            fromOfflineFallback: response.fromOfflineFallback,
+          },
           { sender: 'system', text: transferMsg, time: timeNow },
-        ]);
+        ];
+        setDraft((prev) => ({
+          ...prev,
+          extractedData: merged,
+          alternativeTimes: nextAlternatives,
+          isTransferredToHuman: true,
+          callLog: updatedLog,
+        }));
         speakText(response.spokenResponse);
         announceAriaLive(response.spokenResponse);
 
         addAgentInteraction({
           agentType: 'voice_reservations',
-          interactionData: JSON.stringify({ userText, response, log: callLog }),
+          interactionData: JSON.stringify({ userText, response, log: updatedLog }),
           userId: 'user-guest',
           moduleRef: 'reservations',
           status: 'pending_human_review',
@@ -140,26 +251,46 @@ export const VoiceReservationAgent: React.FC = () => {
         return;
       }
 
-      // If reservation has enough data, complete it
+      const finalLog: VoiceCallLogEntry[] = [
+        ...logAfterUser,
+        {
+          sender: 'agent',
+          text: response.spokenResponse,
+          time: timeNow,
+          fromOfflineFallback: response.fromOfflineFallback,
+        },
+      ];
+
+      // If reservation has enough data, submit (online directly or queued in IndexedDB offline)
       if (merged.guests && merged.time && merged.customerName) {
-        await createReservation({
+        const snapshotDraft: VoiceReservationDraftState = {
+          ...draft,
+          transcript: '',
+          extractedData: merged,
+          alternativeTimes: nextAlternatives,
+          callLog: finalLog,
+        };
+        const { queuedOffline } = await queueSubmission(snapshotDraft);
+        setCompletedBanner({
           customerName: merged.customerName,
-          phone: merged.phone || '+34 600 000 000',
           guests: merged.guests,
           date: merged.date || '2026-10-16',
           time: merged.time,
-          tableNumber: 'Mesa asignada por Sala',
-          status: 'confirmed',
-          channel: 'voice_agent_24_7',
-          notes: 'Procesado mediante Agente NLU en un solo turno',
+          queuedOffline,
         });
+      } else {
+        setDraft((prev) => ({
+          ...prev,
+          extractedData: merged,
+          alternativeTimes: nextAlternatives,
+          callLog: finalLog,
+        }));
       }
 
-      setCallLog((prev) => [...prev, { sender: 'agent', text: response.spokenResponse, time: timeNow }]);
       speakText(response.spokenResponse);
       announceAriaLive(response.spokenResponse);
     } catch {
-      setFailCount((prev) => prev + 1);
+      setDraft((prev) => ({ ...prev, failCount: prev.failCount + 1 }));
     } finally {
       setIsProcessing(false);
     }
@@ -167,14 +298,15 @@ export const VoiceReservationAgent: React.FC = () => {
 
   // DTMF Keypad (Accessibility fallback for speech/hearing impaired)
   const handleDTMFPress = (digit: string) => {
-    setDtmfInput((prev) => prev + digit);
+    setDraft((prev) => ({ ...prev, dtmfInput: prev.dtmfInput + digit }));
     announceAriaLive(`Dígito ${digit} pulsado`);
   };
 
   const handleDTMFSubmit = () => {
     if (!dtmfInput) return;
-    handleProcessUserSpeech(`Selección por teclado DTMF: ${dtmfInput} comensales.`);
-    setDtmfInput('');
+    const currentInput = dtmfInput;
+    updateField('dtmfInput', '');
+    handleProcessUserSpeech(`Selección por teclado DTMF: ${currentInput} comensales.`);
   };
 
   return (
@@ -232,8 +364,74 @@ export const VoiceReservationAgent: React.FC = () => {
         </div>
       </div>
 
+      {/* IndexedDB Offline Draft, Pending Sync & Completion Notices */}
+      {(hasRecoveredDraft || pendingSubmissionsCount > 0 || completedBanner) && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          {hasRecoveredDraft && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-[#022853]">
+              <Clock className="w-4 h-4 text-[#0067B9] shrink-0" />
+              <span>Borrador de llamada y slots recuperado desde IndexedDB.</span>
+              <button
+                type="button"
+                onClick={() => clearDraft()}
+                className="ml-1 font-bold text-rose-700 hover:underline"
+              >
+                Descartar
+              </button>
+              <button
+                type="button"
+                onClick={dismissRecoveredNotice}
+                className="text-slate-400 hover:text-slate-700"
+                aria-label="Ocultar aviso"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {pendingSubmissionsCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">
+              <RefreshCw className={`w-4 h-4 text-amber-700 shrink-0 ${isSyncingPending ? 'animate-spin' : ''}`} />
+              <span>
+                <strong>{pendingSubmissionsCount}</strong>{' '}
+                {pendingSubmissionsCount === 1 ? 'reserva pendiente' : 'reservas pendientes'} en cola IndexedDB
+              </span>
+              {isOnline && !isSyncingPending && (
+                <button
+                  type="button"
+                  onClick={() => flushPendingSubmissions()}
+                  className="ml-1 px-2 py-0.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition"
+                >
+                  Sincronizar
+                </button>
+              )}
+            </div>
+          )}
+
+          {completedBanner && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900">
+              <CheckCircle2 className="w-4 h-4 text-[#48A222] shrink-0" />
+              <span>
+                Reserva de <strong>{completedBanner.customerName}</strong> ({completedBanner.guests} pax · {completedBanner.time}){' '}
+                {completedBanner.queuedOffline
+                  ? 'guardada en IndexedDB para sincronización automática.'
+                  : 'confirmada en sala.'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCompletedBanner(null)}
+                className="text-emerald-700 hover:text-emerald-900"
+                aria-label="Cerrar aviso de reserva"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Main Call Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div id="formulario-reserva" className="grid grid-cols-1 lg:grid-cols-12 gap-6 scroll-mt-6">
         
         {/* Left: Interactive Call & Conversation Feed (7 cols) */}
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-xs p-5 flex flex-col h-[520px]">
@@ -285,8 +483,21 @@ export const VoiceReservationAgent: React.FC = () => {
                         : 'bg-slate-100 text-slate-800 rounded-bl-xs border border-slate-200'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2 text-[10px] opacity-75 font-semibold">
-                      <span>{entry.sender === 'user' ? '👤 Cliente (Llamante)' : '🤖 Agente AsexIA Confia360'}</span>
+                    <div className="flex items-center justify-between gap-2 text-[10px] opacity-80 font-semibold">
+                      <span className="flex items-center gap-1.5">
+                        <span>{entry.sender === 'user' ? '👤 Cliente (Llamante)' : '🤖 Agente AsexIA Confia360'}</span>
+                        {entry.sender === 'agent' && entry.fromOfflineFallback !== undefined && (
+                          <span
+                            className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              entry.fromOfflineFallback
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            }`}
+                          >
+                            {entry.fromOfflineFallback ? 'Respaldo Local' : 'IA Central'}
+                          </span>
+                        )}
+                      </span>
                       <span>{entry.time}</span>
                     </div>
                     <p className="leading-relaxed">{entry.text}</p>
@@ -480,7 +691,7 @@ export const VoiceReservationAgent: React.FC = () => {
       </div>
 
       {/* Booked Reservations Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+      <div id="libro-reservas" className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs scroll-mt-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-[#0067B9]" />

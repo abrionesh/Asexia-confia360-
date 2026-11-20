@@ -29,7 +29,7 @@ export const VoiceCockpitAssistant: React.FC<VoiceCockpitAssistantProps> = ({
 
   const handleReadScreen = () => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      alert('Tu navegador no soporta síntesis de voz Web Speech.');
+      setAssistantReply('Tu navegador no soporta síntesis de voz Web Speech; aquí tienes el resumen en texto: ' + generateSummaryText());
       return;
     }
 

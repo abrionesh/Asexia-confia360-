@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   AttendancePunch,
   ExpenseTicket,
@@ -8,23 +8,32 @@ import {
   SyncConflict,
   BrandConfig,
   AgentInteraction,
-  SyncStatus,
+  OperativaTabId,
+  OperativaModuleKPI,
+  MonthlyPerformanceSummary,
 } from '../types';
 import { LocalDB, DEFAULT_BRAND_CONFIG } from '../services/storage';
+import { ApiService } from '../services/api';
+import { INITIAL_ECONOMIC_METRICS, INITIAL_STRATEGIC_METRICS } from '../services/cockpitData';
+import {
+  IndexedDbFormsStore,
+  IndexedDbFormDraft,
+  IndexedDbPendingSubmission,
+} from '../services/indexedDbForms';
 import { EntityHubType } from '../services/dataModel360';
 import { BusinessSector } from '../types/modules';
 import { UserRole, BusinessIdentity, DEFAULT_BUSINESS_IDENTITY } from '../types/userProfile';
 
 export interface NavigationState {
   view: 'inicio' | 'operativa' | 'cockpit' | 'director' | 'reputacion';
-  operativaTab?: 'fichaje' | 'gastos' | 'reservas_voz' | 'rrhh_turnos' | 'economico_alertas' | 'monitor_sync';
+  operativaTab?: OperativaTabId;
   directorTab?: 'ux_ui_wireframes' | 'project_plan_agile' | 'software_architecture';
   title: string;
 }
 
 export const getScreenTitle = (
   view: 'inicio' | 'operativa' | 'cockpit' | 'director' | 'reputacion',
-  operativaTab?: 'fichaje' | 'gastos' | 'reservas_voz' | 'rrhh_turnos' | 'economico_alertas' | 'monitor_sync',
+  operativaTab?: OperativaTabId,
   directorTab?: 'ux_ui_wireframes' | 'project_plan_agile' | 'software_architecture'
 ): string => {
   if (view === 'inicio') return 'Inicio y Catálogo de Módulos AsexIA Confia360';
@@ -48,7 +57,7 @@ export const getScreenTitle = (
 
 export const getScreenAudioDescription = (
   view: 'inicio' | 'operativa' | 'cockpit' | 'director' | 'reputacion',
-  operativaTab?: 'fichaje' | 'gastos' | 'reservas_voz' | 'rrhh_turnos' | 'economico_alertas' | 'monitor_sync',
+  operativaTab?: OperativaTabId,
   directorTab?: 'ux_ui_wireframes' | 'project_plan_agile' | 'software_architecture'
 ): string => {
   if (view === 'inicio') {
@@ -91,8 +100,8 @@ interface AppContextType {
   // Navigation & View Modes
   activeView: 'inicio' | 'operativa' | 'cockpit' | 'director' | 'reputacion';
   setActiveView: (view: 'inicio' | 'operativa' | 'cockpit' | 'director' | 'reputacion') => void;
-  activeOperativaTab: 'fichaje' | 'gastos' | 'reservas_voz' | 'rrhh_turnos' | 'economico_alertas' | 'monitor_sync';
-  setActiveOperativaTab: (tab: 'fichaje' | 'gastos' | 'reservas_voz' | 'rrhh_turnos' | 'economico_alertas' | 'monitor_sync') => void;
+  activeOperativaTab: OperativaTabId;
+  setActiveOperativaTab: (tab: OperativaTabId) => void;
   activeDirectorTab: 'ux_ui_wireframes' | 'project_plan_agile' | 'software_architecture';
   setActiveDirectorTab: (tab: 'ux_ui_wireframes' | 'project_plan_agile' | 'software_architecture') => void;
 
@@ -160,13 +169,21 @@ interface AppContextType {
   reservations: Reservation[];
   shifts: EmployeeShift[];
   agentInteractions: AgentInteraction[];
+  getActiveModuleKPIs: (tab?: OperativaTabId, role?: UserRole) => OperativaModuleKPI[];
+  getOperativaModuleKPIs: (tab?: OperativaTabId, role?: UserRole) => OperativaModuleKPI[];
+  getAllOperativaModuleKPIs: (role?: UserRole) => Record<OperativaTabId, OperativaModuleKPI[]>;
+  currentOperativaKPIs: OperativaModuleKPI[];
+  monthlyPerformanceKPIs: MonthlyPerformanceSummary;
 
   // Sync Queue & Conflict Resolution
   syncQueue: SyncQueueItem[];
   syncConflicts: SyncConflict[];
+  idbDrafts: IndexedDbFormDraft[];
+  idbPendingSubmissions: IndexedDbPendingSubmission[];
   pendingSyncCount: number;
   isSyncingNow: boolean;
   triggerManualSync: () => Promise<void>;
+  discardIdbDraft: (formId: string) => Promise<void>;
   resolveConflict: (conflictId: string, choice: 'keep_local' | 'accept_server') => void;
   clearResolvedQueue: () => void;
   simulateConflictDemo: () => void;
@@ -199,7 +216,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Views & Tabs
   const [activeView, setActiveViewInternal] = useState<'inicio' | 'operativa' | 'cockpit' | 'director' | 'reputacion'>('inicio');
-  const [activeOperativaTab, setActiveOperativaTabInternal] = useState<'fichaje' | 'gastos' | 'reservas_voz' | 'rrhh_turnos' | 'economico_alertas' | 'monitor_sync'>('fichaje');
+  const [activeOperativaTab, setActiveOperativaTabInternal] = useState<OperativaTabId>('fichaje');
   const [activeDirectorTab, setActiveDirectorTabInternal] = useState<'ux_ui_wireframes' | 'project_plan_agile' | 'software_architecture'>('ux_ui_wireframes');
   const [navigationHistory, setNavigationHistory] = useState<NavigationState[]>([]);
   const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
@@ -304,6 +321,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Sync Queue & Conflicts
   const [syncQueue, setSyncQueue] = useState<SyncQueueItem[]>(LocalDB.getSyncQueue);
   const [syncConflicts, setSyncConflicts] = useState<SyncConflict[]>(LocalDB.getSyncConflicts);
+  const [idbDrafts, setIdbDrafts] = useState<IndexedDbFormDraft[]>([]);
+  const [idbPendingSubmissions, setIdbPendingSubmissions] = useState<IndexedDbPendingSubmission[]>([]);
+  const flushIdbRef = React.useRef<() => Promise<void>>(async () => {});
 
   // Effective Online State
   const effectiveOnline = browserOnline && !isSimulatedOffline;
@@ -446,7 +466,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   const setActiveOperativaTab = useCallback(
-    (tab: 'fichaje' | 'gastos' | 'reservas_voz' | 'rrhh_turnos' | 'economico_alertas' | 'monitor_sync') => {
+    (tab: OperativaTabId) => {
       if (tab !== activeOperativaTab || activeView !== 'operativa') {
         pushStateToHistory(activeView, activeOperativaTab, activeDirectorTab);
         setActiveViewInternal('operativa');
@@ -552,8 +572,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [announceAriaLive]);
 
-  // Pending count calculation
-  const pendingSyncCount = syncQueue.filter(item => item.status === 'pending_offline' || item.status === 'syncing').length;
+  // Hydrate & subscribe to IndexedDB operational form drafts and pending submissions
+  const refreshIdbState = useCallback(async () => {
+    const [drafts, pending] = await Promise.all([
+      IndexedDbFormsStore.getAllDrafts(),
+      IndexedDbFormsStore.getPendingSubmissions(),
+    ]);
+    setIdbDrafts(drafts);
+    setIdbPendingSubmissions(pending);
+  }, []);
+
+  useEffect(() => {
+    refreshIdbState();
+    return IndexedDbFormsStore.subscribe(() => {
+      refreshIdbState();
+    });
+  }, [refreshIdbState]);
+
+  const discardIdbDraft = useCallback(
+    async (formId: string) => {
+      await IndexedDbFormsStore.deleteDraft(formId);
+      await refreshIdbState();
+      announceAriaLive('Borrador offline eliminado de IndexedDB.');
+    },
+    [announceAriaLive, refreshIdbState]
+  );
+
+  // Pending count calculation (LocalDB queue + IndexedDB pending submissions)
+  const pendingSyncCount =
+    syncQueue.filter(item => item.status === 'pending_offline' || item.status === 'syncing').length +
+    idbPendingSubmissions.length;
 
   // Toggle simulated offline
   const toggleSimulatedOffline = () => {
@@ -595,7 +643,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map(item => (item.status === 'pending_offline' ? { ...item, status: 'syncing' } : item))
     );
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await flushIdbRef.current();
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Update statuses to synced
     setSyncQueue(prev =>
@@ -788,14 +837,762 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // 5. AGENT INTERACTIONS
-  const addAgentInteraction = (interaction: Omit<AgentInteraction, 'id' | 'updatedAt'>) => {
+  const addAgentInteraction = useCallback((interaction: Omit<AgentInteraction, 'id' | 'updatedAt'>) => {
     const newInt: AgentInteraction = {
       ...interaction,
       id: `ai-${Date.now()}`,
       updatedAt: new Date().toISOString(),
     };
     setAgentInteractions(prev => [newInt, ...prev]);
-  };
+  }, []);
+
+  // Global IndexedDB Pending Flush (runs even if the originating form tab is unmounted)
+  const flushAllIdbPending = useCallback(async () => {
+    if (!effectiveOnline) return;
+    const pending = await IndexedDbFormsStore.getPendingSubmissions<Record<string, any>>();
+    for (const item of pending) {
+      if (item.status === 'syncing') continue;
+      if (!IndexedDbFormsStore.acquireSubmissionLock(item.id)) continue;
+      try {
+        await IndexedDbFormsStore.updateSubmissionStatus(item.id, 'syncing');
+        if (item.formId === 'operativa_gastos_ocr') {
+          const d = item.payload;
+          await saveExpenseTicket({
+            providerName: d.providerName || 'Proveedor sin especificar',
+            documentType: d.docType || 'factura',
+            invoiceNumber: d.invoiceNumber || 'S/N-PROV',
+            date: d.date || new Date().toISOString().split('T')[0],
+            dueDate: d.dueDate || '2026-11-15',
+            taxBase: Number(d.taxBase || 0),
+            vatRate: Number(d.vatRate || 10),
+            vatAmount: Number(d.vatAmount || 0),
+            totalAmount: Number(d.totalAmount || 0),
+            category: d.category || 'Materia Prima / Perecederos',
+            suggestedCategory: d.category || 'Materia Prima / Perecederos',
+            status: d.invoiceStatus || 'pendiente_aprobacion',
+            auditAlert: d.auditAlert ?? null,
+            productLines: Array.isArray(d.productLines) ? d.productLines : [],
+            hasEscandalloImpact: Array.isArray(d.productLines) && d.productLines.some((p: any) => !!p.linkedDishName),
+            linkedVenue: 'Restaurante Puerta del Sol (Centro)',
+            paymentMethod: 'Transferencia a 30 días',
+            isProVersionEnabled: Boolean(d.isProVersionEnabled),
+            createdBy: 'Empleado de Sala / Cocina',
+            imageUrl: d.ticketImage || undefined,
+          });
+        } else if (item.formId === 'operativa_reservas_voz') {
+          const data = item.payload?.extractedData;
+          if (data?.guests && data?.time && data?.customerName) {
+            await createReservation({
+              customerName: data.customerName,
+              phone: data.phone || '+34 600 000 000',
+              guests: Number(data.guests),
+              date: data.date || '2026-10-16',
+              time: data.time,
+              tableNumber: 'Mesa asignada por Sala',
+              status: 'confirmed',
+              channel: 'voice_agent_24_7',
+              notes: 'Sincronizado desde cola offline IndexedDB',
+            });
+          }
+        } else if (item.formId === 'operativa_rrhh_pending_sync') {
+          const msg = item.payload?.message;
+          if (msg) {
+            const response = await ApiService.processHRAssistant({
+              message: msg,
+              employeeContext: {
+                name: 'Carlos Ruiz',
+                role: 'Camarero / Sala',
+                vacationDaysLeft: Number(item.payload?.vacationDaysSnapshot ?? 14),
+                nextShift: {
+                  date: 'Mañana (11 de Octubre)',
+                  time: '10:00 - 16:30',
+                  location: 'Restaurante Puerta del Sol',
+                },
+              },
+            });
+            if (response.fromOfflineFallback) {
+              throw new Error('Servidor IA no disponible todavía.');
+            }
+            addAgentInteraction({
+              agentType: 'chat_shifts',
+              interactionData: JSON.stringify({
+                userPrompt: msg,
+                response,
+                syncedFromIndexedDb: true,
+              }),
+              userId: 'emp-101',
+              moduleRef: 'shifts',
+              status: 'completed',
+            });
+          }
+        } else if (item.formId === 'operativa_fichaje_cero_toque') {
+          const punchId = item.payload?.punchId;
+          const note = item.payload?.note;
+          if (punchId) {
+            setPunches(prev =>
+              prev.map(p =>
+                p.id === punchId
+                  ? {
+                      ...p,
+                      syncStatus: 'synced',
+                      notes: note ? `${p.notes || 'Fichaje'} · ${note}` : p.notes,
+                    }
+                  : p
+              )
+            );
+          }
+        }
+        await IndexedDbFormsStore.updateSubmissionStatus(item.id, 'synced');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Error sincronizando IndexedDB';
+        await IndexedDbFormsStore.updateSubmissionStatus(item.id, 'pending_offline', message);
+      } finally {
+        IndexedDbFormsStore.releaseSubmissionLock(item.id);
+      }
+    }
+    await refreshIdbState();
+  }, [effectiveOnline, addAgentInteraction, refreshIdbState]);
+
+  flushIdbRef.current = flushAllIdbPending;
+
+  useEffect(() => {
+    if (effectiveOnline && idbPendingSubmissions.length > 0) {
+      flushAllIdbPending();
+    }
+  }, [effectiveOnline, idbPendingSubmissions.length, flushAllIdbPending]);
+
+  const monthlyPerformanceKPIs = useMemo<MonthlyPerformanceSummary>(() => {
+    const parseShiftHours = (startTime: string, endTime: string): number => {
+      const [sh, sm] = startTime.split(':').map(Number);
+      const [eh, em] = endTime.split(':').map(Number);
+      if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 6.5;
+      let diff = eh * 60 + em - (sh * 60 + sm);
+      if (diff <= 0) diff += 24 * 60;
+      return diff / 60;
+    };
+
+    // 1. Ventas Mensuales (baseline mensual + variación en tiempo real por reservas activas)
+    const activeReservations = reservations.filter((r) => r.status !== 'cancelled');
+    const activeGuests = activeReservations.reduce((acc, r) => acc + (r.guests || 0), 0);
+    const seedGuestsBaseline = 10; // res-301 (4) + res-302 (6)
+    const ticketMedio = INITIAL_STRATEGIC_METRICS.ticketMedioGlobal; // 59.66 €
+    const liveSalesDelta = (activeGuests - seedGuestsBaseline) * ticketMedio;
+
+    const currentSales = Math.max(0, INITIAL_ECONOMIC_METRICS.ingresos + liveSalesDelta);
+    const previousSales = Number(
+      (INITIAL_ECONOMIC_METRICS.ingresos / (1 + INITIAL_ECONOMIC_METRICS.ingresosVarPct / 100)).toFixed(2)
+    );
+    const salesMonthlyChangePct =
+      previousSales > 0 ? Number((((currentSales - previousSales) / previousSales) * 100).toFixed(1)) : 0;
+
+    // 2. Coste Laboral Mensual (cuadrante de turnos, fichajes activos y partidas de personal)
+    const totalShiftHours = shifts.reduce((acc, s) => acc + parseShiftHours(s.startTime, s.endTime), 0);
+    const seedShiftHoursBaseline = 21; // 6.5h + 8.5h + 6h
+    const entryPunchesCount = punches.filter((p) => p.type === 'entrada').length;
+    const seedPunchesBaseline = 2;
+    const extraLaborHoursCost =
+      (totalShiftHours - seedShiftHoursBaseline) * 18.5 + (entryPunchesCount - seedPunchesBaseline) * 42;
+    const payrollExpensesSum = expenses
+      .filter((e) => /personal|nómina|nomina|rrhh|laboral|seguridad social/i.test(`${e.category} ${e.providerName}`))
+      .reduce((acc, e) => acc + (e.totalAmount || 0), 0);
+
+    const baselineCurrentLabor = INITIAL_ECONOMIC_METRICS.ingresos * (INITIAL_STRATEGIC_METRICS.laborCostRatio / 100);
+    const currentLaborCost = Math.max(0, baselineCurrentLabor + extraLaborHoursCost + payrollExpensesSum);
+
+    const previousLaborRatioPct = 34.2; // Mes anterior antes de optimizar turnos con Confia360
+    const previousLaborCost = Number((previousSales * (previousLaborRatioPct / 100)).toFixed(2));
+    const laborMonthlyChangePct =
+      previousLaborCost > 0
+        ? Number((((currentLaborCost - previousLaborCost) / previousLaborCost) * 100).toFixed(1))
+        : 0;
+
+    const currentLaborRatioPct =
+      currentSales > 0 ? Number(((currentLaborCost / currentSales) * 100).toFixed(1)) : 0;
+    const ratioDeltaPts = Number((currentLaborRatioPct - previousLaborRatioPct).toFixed(1));
+
+    const now = new Date();
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
+    const currentMonthLabel = capitalize(now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }));
+    const previousMonthLabel = capitalize(prevDate.toLocaleDateString('es-ES', { month: 'long' }));
+
+    // 3. Serie diaria de los últimos 7 días (Ventas y Coste Laboral) reactiva a los datos en vivo
+    const avgDailySales = INITIAL_ECONOMIC_METRICS.ingresos / 30;
+    const avgDailyLabor = baselineCurrentLabor / 30;
+    // Pesos realistas por día de la semana en hostelería (Dom..Sáb: 0..6)
+    const weekdaySalesWeights = [1.18, 0.72, 0.78, 0.88, 0.96, 1.24, 1.38];
+    const weekdayLaborWeights = [1.06, 0.85, 0.88, 0.92, 0.98, 1.12, 1.19];
+
+    const dailySeries7d = Array.from({ length: 7 }, (_, idx) => {
+      const offsetDays = 6 - idx;
+      const d = new Date(now);
+      d.setDate(now.getDate() - offsetDays);
+      const dow = d.getDay();
+      const isToday = offsetDays === 0;
+
+      const baseVentas = avgDailySales * weekdaySalesWeights[dow];
+      const baseLabor = avgDailyLabor * weekdayLaborWeights[dow];
+
+      const dailyVentas = Math.max(0, Math.round(baseVentas + (isToday ? liveSalesDelta : 0)));
+      const dailyLabor = Math.max(
+        0,
+        Math.round(baseLabor + (isToday ? Math.max(-baseLabor * 0.4, extraLaborHoursCost + payrollExpensesSum * 0.15) : 0))
+      );
+      const dailyRatio = dailyVentas > 0 ? Number(((dailyLabor / dailyVentas) * 100).toFixed(1)) : 0;
+
+      const shortWeekday = capitalize(d.toLocaleDateString('es-ES', { weekday: 'short' })).replace('.', '');
+      return {
+        dayLabel: isToday ? 'Hoy' : shortWeekday,
+        fullDate: d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }),
+        ventas: dailyVentas,
+        costeLaboral: dailyLabor,
+        laborRatioPct: dailyRatio,
+      };
+    });
+
+    return {
+      currentMonthLabel,
+      previousMonthLabel,
+      ventas: {
+        id: 'ventas',
+        label: 'Ventas Mensuales',
+        currentAmount: Number(currentSales.toFixed(0)),
+        previousAmount: Number(previousSales.toFixed(0)),
+        monthlyChangePct: salesMonthlyChangePct,
+        isFavorable: salesMonthlyChangePct >= 0,
+        targetHint: `Objetivo mensual: +5,0% · Ticket medio ${ticketMedio.toFixed(2)} €`,
+        driverSummary: `${activeReservations.length} reservas activas (${activeGuests} pax) · Base multi-local integrada`,
+      },
+      costeLaboral: {
+        id: 'coste_laboral',
+        label: 'Coste Laboral',
+        currentAmount: Number(currentLaborCost.toFixed(0)),
+        previousAmount: Number(previousLaborCost.toFixed(0)),
+        monthlyChangePct: laborMonthlyChangePct,
+        ratioPct: currentLaborRatioPct,
+        previousRatioPct: previousLaborRatioPct,
+        ratioDeltaPts,
+        isFavorable: ratioDeltaPts <= 0,
+        targetHint: `Ratio óptimo < 35,0% s/ ventas (mes ant.: ${previousLaborRatioPct.toFixed(1)}%)`,
+        driverSummary: `${shifts.length} turnos (${totalShiftHours.toFixed(1)}h) · ${entryPunchesCount} fichajes entrada · ${businessIdentity.employeeCount} emp.`,
+      },
+      netMarginAfterLaborPct: Number((100 - currentLaborRatioPct).toFixed(1)),
+      dailySeries7d,
+    };
+  }, [reservations, shifts, punches, expenses, businessIdentity.employeeCount]);
+
+  // Role-priority map & Dynamic KPIs calculator explicitly mapped to activeOperativaTab + activeRole
+  const getOperativaModuleKPIs = useCallback(
+    (tab: OperativaTabId = activeOperativaTab, role: UserRole = activeRole): OperativaModuleKPI[] => {
+      const formatEur = (amount: number) =>
+        `${amount.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €`;
+      const formatSignedPct = (val: number) =>
+        `${val > 0 ? '+' : ''}${val.toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+
+      const ROLE_PRIORITY_KPI_MAP: Record<UserRole, Record<OperativaTabId, string>> = {
+        autonomo_gerente: {
+          fichaje: 'fichaje-activos',
+          gastos: 'gastos-auditoria',
+          reservas_voz: 'reservas-comensales',
+          rrhh_turnos: 'rrhh-confirmados',
+          economico_alertas: 'eco-alertas',
+          monitor_sync: 'sync-pendientes',
+        },
+        comercial: {
+          fichaje: 'fichaje-activos',
+          gastos: 'gastos-total',
+          reservas_voz: 'reservas-confirmadas',
+          rrhh_turnos: 'rrhh-confirmados',
+          economico_alertas: 'eco-aprobado',
+          monitor_sync: 'sync-sincronizados',
+        },
+        administracion: {
+          fichaje: 'fichaje-ultimo',
+          gastos: 'gastos-pendientes',
+          reservas_voz: 'reservas-revision',
+          rrhh_turnos: 'rrhh-asignados',
+          economico_alertas: 'eco-pendiente',
+          monitor_sync: 'sync-pendientes',
+        },
+        gestoria: {
+          fichaje: 'fichaje-itss',
+          gastos: 'gastos-iva',
+          reservas_voz: 'reservas-revision',
+          rrhh_turnos: 'rrhh-vacaciones',
+          economico_alertas: 'eco-sync',
+          monitor_sync: 'sync-conflictos',
+        },
+        operaciones_sector: {
+          fichaje: 'fichaje-gps',
+          gastos: 'gastos-auditoria',
+          reservas_voz: 'reservas-canal-voz',
+          rrhh_turnos: 'rrhh-confirmados',
+          economico_alertas: 'eco-alertas',
+          monitor_sync: 'sync-conectividad',
+        },
+      };
+
+      const priorityId = ROLE_PRIORITY_KPI_MAP[role]?.[tab];
+      const markPriority = (items: OperativaModuleKPI[]): OperativaModuleKPI[] => {
+        const tagged = items.map((item) => ({
+          ...item,
+          isRolePriority: item.id === priorityId,
+        }));
+        return [...tagged].sort((a, b) => Number(b.isRolePriority) - Number(a.isRolePriority));
+      };
+
+      const kpiCalculatorsByTab: Record<OperativaTabId, () => OperativaModuleKPI[]> = {
+        fichaje: () => {
+          const entryPunches = punches.filter((p) => p.type === 'entrada').length;
+          const uniqueEmployees = new Set(punches.map((p) => p.employeeId)).size;
+          const withinRadiusCount = punches.filter((p) => p.isWithinRadius).length;
+          const gpsCompliancePct = punches.length > 0 ? Math.round((withinRadiusCount / punches.length) * 100) : 100;
+          const latestPunch = punches[0];
+          const pendingPunches = punches.filter((p) => p.syncStatus !== 'synced').length;
+          const idbPunchPending = idbPendingSubmissions.filter((item) => item.module === 'fichaje').length;
+          const idbPunchDrafts = idbDrafts.filter((d) => d.module === 'fichaje' && d.dirty).length;
+          const latestTypeLabel =
+            latestPunch?.type === 'entrada'
+              ? 'En jornada'
+              : latestPunch?.type === 'pausa'
+              ? 'En descanso'
+              : latestPunch?.type === 'salida'
+              ? 'Salida registrada'
+              : 'Sin registros';
+
+          return [
+            {
+              id: 'fichaje-activos',
+              label: 'Personal Fichado Hoy',
+              value: `${uniqueEmployees || entryPunches} activos`,
+              subtext: `${entryPunches} entradas · Coste Laboral ${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}% s/ ventas`,
+              highlight: 'text-emerald-400',
+              iconKey: 'users',
+              targetElementId: 'historial-fichajes',
+              calculationFormula: `Empleados únicos (${uniqueEmployees}) con registro hoy. Ratio Coste Laboral = (${formatEur(monthlyPerformanceKPIs.costeLaboral.currentAmount)} / ${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)}) × 100 = ${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}%.`,
+            },
+            {
+              id: 'fichaje-gps',
+              label: 'Perímetro GPS Local',
+              value: `${gpsCompliancePct}% en radio`,
+              subtext: `${withinRadiusCount}/${punches.length} fichajes validados (<150m)`,
+              highlight: gpsCompliancePct >= 90 ? 'text-cyan-300' : 'text-amber-400',
+              iconKey: 'shield_check',
+              targetElementId: 'historial-fichajes',
+              calculationFormula: `(% Validación GPS) = (${withinRadiusCount} en radio ≤150m / ${punches.length} fichajes totales) × 100 = ${gpsCompliancePct}%.`,
+            },
+            {
+              id: 'fichaje-ultimo',
+              label: 'Último Estado Registrado',
+              value: latestTypeLabel,
+              subtext: latestPunch
+                ? `${latestPunch.employeeName} · ${new Date(latestPunch.timestamp).toLocaleTimeString('es-ES', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}`
+                : 'Esperando primer fichaje',
+              highlight: 'text-indigo-300',
+              iconKey: 'clock',
+              drawerHub: 'turno',
+              calculationFormula: `Derivado del último evento cronológico en la lista de fichajes (${punches.length} registros ordenados por marca temporal).`,
+            },
+            {
+              id: 'fichaje-itss',
+              label: 'Respaldo Offline & ITSS',
+              value: pendingPunches + idbPunchPending === 0 ? '100% Sincronizado' : `${pendingPunches + idbPunchPending} pendientes`,
+              subtext:
+                idbPunchDrafts > 0
+                  ? `${idbPunchDrafts} nota(s) guardada(s) en IndexedDB`
+                  : `Impacto Coste Laboral: ${formatEur(monthlyPerformanceKPIs.costeLaboral.currentAmount)}/mes`,
+              highlight: pendingPunches + idbPunchPending > 0 ? 'text-amber-400' : 'text-emerald-400',
+              iconKey: 'check_circle',
+              targetElementId: 'historial-fichajes',
+              calculationFormula: `Pendientes = ${pendingPunches} fichajes sin sincronizar + ${idbPunchPending} en cola IndexedDB. Variación Coste Laboral: ${formatSignedPct(monthlyPerformanceKPIs.costeLaboral.monthlyChangePct)} vs. ${monthlyPerformanceKPIs.previousMonthLabel}.`,
+            },
+          ];
+        },
+
+        gastos: () => {
+          const totalAmount = expenses.reduce((acc, e) => acc + (e.totalAmount || 0), 0);
+          const pendingApproval = expenses.filter(
+            (e) =>
+              e.status === 'pendiente_revision' ||
+              e.status === 'pendiente_aprobacion' ||
+              e.status === 'pending_approval'
+          );
+          const auditAlerts = expenses.filter((e) => Boolean(e.auditAlert) || e.status === 'en_disputa');
+          const totalVat = expenses.reduce((acc, e) => acc + (e.vatAmount || 0), 0);
+          const idbExpensePending = idbPendingSubmissions.filter((item) => item.module === 'gastos').length;
+          const idbExpenseDrafts = idbDrafts.filter((d) => d.module === 'gastos' && d.dirty).length;
+          const salesSharePct =
+            monthlyPerformanceKPIs.ventas.currentAmount > 0
+              ? ((totalAmount / monthlyPerformanceKPIs.ventas.currentAmount) * 100).toFixed(1)
+              : '0.0';
+          const alertSubtext =
+            auditAlerts.length > 0
+              ? `${auditAlerts[0].providerName.split(' ').slice(0, 3).join(' ')} requiere revisión`
+              : 'Precios de escandallo estables';
+
+          return [
+            {
+              id: 'gastos-total',
+              label: 'Gastos Registrados',
+              value: formatEur(totalAmount),
+              subtext: `${expenses.length} docs (${salesSharePct}% s/ Ventas) · ${idbExpenseDrafts} borrador(es)`,
+              highlight: 'text-emerald-400',
+              iconKey: 'receipt',
+              targetElementId: 'alertas-gastos',
+              calculationFormula: `Suma de ${expenses.length} tickets/facturas (${formatEur(totalAmount)}). Peso sobre Ventas = (${formatEur(totalAmount)} / ${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)}) × 100 = ${salesSharePct}%.`,
+            },
+            {
+              id: 'gastos-pendientes',
+              label: 'Pendientes de Revisión',
+              value: `${pendingApproval.length + idbExpensePending} docs`,
+              subtext:
+                idbExpensePending > 0
+                  ? `${pendingApproval.length} en panel + ${idbExpensePending} offline`
+                  : 'Listos para validar en 3 pasos',
+              highlight: pendingApproval.length + idbExpensePending > 0 ? 'text-amber-400' : 'text-slate-300',
+              iconKey: 'alert_triangle',
+              targetElementId: 'alertas-gastos',
+              calculationFormula: `Documentos en revisión/aprobación (${pendingApproval.length}) + envíos OCR en cola offline IndexedDB (${idbExpensePending}).`,
+            },
+            {
+              id: 'gastos-auditoria',
+              label: 'Auditoría & Disputas',
+              value: `${auditAlerts.length} ${auditAlerts.length === 1 ? 'Alerta' : 'Alertas'}`,
+              subtext: alertSubtext,
+              highlight: auditAlerts.length > 0 ? 'text-rose-400' : 'text-emerald-400',
+              iconKey: 'trending_up',
+              drawerHub: 'plato_escandallo',
+              calculationFormula: `Facturas con alerta de desviación de precio en escandallo o estado 'en_disputa' (${auditAlerts.length} de ${expenses.length}).`,
+            },
+            {
+              id: 'gastos-iva',
+              label: 'IVA Soportado Deducible',
+              value: formatEur(totalVat),
+              subtext: `Computable mod. 303 · Ventas ${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)}`,
+              highlight: 'text-cyan-300',
+              iconKey: 'sparkles',
+              drawerHub: 'albaran',
+              calculationFormula: `Suma del IVA desglosado en ${expenses.length} documentos (${formatEur(totalVat)}). Crecimiento Ventas: ${formatSignedPct(monthlyPerformanceKPIs.ventas.monthlyChangePct)} vs. ${monthlyPerformanceKPIs.previousMonthLabel}.`,
+            },
+          ];
+        },
+
+        reservas_voz: () => {
+          const confirmedReservations = reservations.filter((r) => r.status === 'confirmed');
+          const waitlistReservations = reservations.filter((r) => r.status === 'waitlist');
+          const confirmedGuests = confirmedReservations.reduce((acc, r) => acc + (r.guests || 0), 0);
+          const venueCapacity = 70;
+          const occupancyPct = Math.min(100, Math.round((confirmedGuests / venueCapacity) * 100));
+          const voiceChannelCount = reservations.filter((r) => r.channel === 'voice_agent_24_7').length;
+          const pendingVoiceReview = agentInteractions.filter(
+            (a) => a.agentType === 'voice_reservations' && a.status === 'pending_human_review'
+          ).length;
+          const idbResPending = idbPendingSubmissions.filter((item) => item.module === 'reservas_voz').length;
+          const idbResDrafts = idbDrafts.filter((d) => d.module === 'reservas_voz' && d.dirty).length;
+
+          return [
+            {
+              id: 'reservas-confirmadas',
+              label: 'Reservas Confirmadas',
+              value: `${confirmedReservations.length} mesas`,
+              subtext: `${reservations.length} totales (${waitlistReservations.length} en lista espera)`,
+              highlight: 'text-amber-400',
+              iconKey: 'utensils_crossed',
+              targetElementId: 'libro-reservas',
+              calculationFormula: `Reservas con estado 'confirmed' (${confirmedReservations.length}) sobre ${reservations.length} totales (${waitlistReservations.length} en lista de espera).`,
+            },
+            {
+              id: 'reservas-comensales',
+              label: 'Comensales & Ventas Mes',
+              value: `${confirmedGuests} pax`,
+              subtext: `Ocupación ${occupancyPct}% · Ventas ${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)} (${formatSignedPct(monthlyPerformanceKPIs.ventas.monthlyChangePct)})`,
+              highlight: 'text-emerald-400',
+              iconKey: 'users',
+              targetElementId: 'libro-reservas',
+              calculationFormula: `Ocupación = (${confirmedGuests} pax / ${venueCapacity} plazas) × 100 = ${occupancyPct}%. Crecimiento Ventas = ((${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)} − ${formatEur(monthlyPerformanceKPIs.ventas.previousAmount)}) / ${formatEur(monthlyPerformanceKPIs.ventas.previousAmount)}) × 100 = ${formatSignedPct(monthlyPerformanceKPIs.ventas.monthlyChangePct)}.`,
+            },
+            {
+              id: 'reservas-canal-voz',
+              label: 'Agente Telefónico 24/7',
+              value: effectiveOnline ? `${voiceChannelCount} vía Voz IA` : 'Respaldo Local',
+              subtext: effectiveOnline ? 'Recepción automática en línea' : 'Cola offline IndexedDB activa',
+              highlight: effectiveOnline ? 'text-cyan-300' : 'text-amber-400',
+              iconKey: 'mic',
+              targetElementId: 'formulario-reserva',
+              calculationFormula: `Reservas captadas automáticamente por el canal 'voice_agent_24_7' (${voiceChannelCount} de ${reservations.length}).`,
+            },
+            {
+              id: 'reservas-revision',
+              label: 'Revisiones & Pendientes',
+              value: `${pendingVoiceReview + waitlistReservations.length + idbResPending} gestiones`,
+              subtext:
+                idbResPending > 0
+                  ? `${idbResPending} en cola offline por sincronizar`
+                  : idbResDrafts > 0
+                  ? `${idbResDrafts} borrador(es) de llamada en IndexedDB`
+                  : `${pendingVoiceReview} alertas IA · ${waitlistReservations.length} espera`,
+              highlight:
+                pendingVoiceReview + waitlistReservations.length + idbResPending > 0
+                  ? 'text-amber-400'
+                  : 'text-indigo-300',
+              iconKey: 'shield_check',
+              targetElementId: 'formulario-reserva',
+              calculationFormula: `Suma de interacciones IA por revisar (${pendingVoiceReview}) + lista de espera (${waitlistReservations.length}) + reservas offline en IndexedDB (${idbResPending}).`,
+            },
+          ];
+        },
+
+        rrhh_turnos: () => {
+          const totalShifts = shifts.length;
+          const confirmedShifts = shifts.filter((s) => s.status === 'confirmed').length;
+          const pendingShifts = shifts.filter((s) => s.status !== 'confirmed').length;
+          const coveragePct = totalShifts > 0 ? Math.round((confirmedShifts / totalShifts) * 100) : 100;
+          const avgVacationDays =
+            totalShifts > 0
+              ? (shifts.reduce((acc, s) => acc + (s.vacationDaysLeft || 0), 0) / totalShifts).toFixed(1)
+              : '0';
+          const hrInteractionsCount = agentInteractions.filter((a) => a.agentType === 'chat_shifts').length;
+          const idbHrPending = idbPendingSubmissions.filter((item) => item.module === 'rrhh_turnos').length;
+          const idbHrDrafts = idbDrafts.filter((d) => d.module === 'rrhh_turnos' && d.dirty).length;
+
+          return [
+            {
+              id: 'rrhh-asignados',
+              label: 'Turnos & Coste Laboral',
+              value: `${totalShifts} puestos`,
+              subtext: `Coste Laboral ${formatEur(monthlyPerformanceKPIs.costeLaboral.currentAmount)} (${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}% s/ ventas)`,
+              highlight: 'text-indigo-300',
+              iconKey: 'calendar',
+              targetElementId: 'nuevo-turno',
+              calculationFormula: `Ratio Coste Laboral = (${formatEur(monthlyPerformanceKPIs.costeLaboral.currentAmount)} / ${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)}) × 100 = ${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}%, ajustado en vivo por horas de ${totalShifts} turnos y fichajes.`,
+            },
+            {
+              id: 'rrhh-confirmados',
+              label: 'Turnos Confirmados',
+              value: `${confirmedShifts}/${totalShifts} (${coveragePct}%)`,
+              subtext: pendingShifts > 0 ? `${pendingShifts} pendiente(s) de confirmar` : 'Todo el equipo confirmado',
+              highlight: pendingShifts === 0 ? 'text-emerald-400' : 'text-amber-400',
+              iconKey: 'check_circle',
+              targetElementId: 'nuevo-turno',
+              calculationFormula: `Cobertura = (${confirmedShifts} turnos confirmados / ${totalShifts} turnos totales) × 100 = ${coveragePct}%.`,
+            },
+            {
+              id: 'rrhh-vacaciones',
+              label: 'Saldo Medio Vacaciones',
+              value: `${avgVacationDays} días`,
+              subtext: `Variación Coste Laboral: ${formatSignedPct(monthlyPerformanceKPIs.costeLaboral.monthlyChangePct)}`,
+              highlight: 'text-cyan-300',
+              iconKey: 'users',
+              drawerHub: 'turno',
+              calculationFormula: `Media de días pendientes entre ${totalShifts} turnos (${avgVacationDays}d). Variación Coste Laboral = ((${formatEur(monthlyPerformanceKPIs.costeLaboral.currentAmount)} − ${formatEur(monthlyPerformanceKPIs.costeLaboral.previousAmount)}) / ${formatEur(monthlyPerformanceKPIs.costeLaboral.previousAmount)}) × 100 = ${formatSignedPct(monthlyPerformanceKPIs.costeLaboral.monthlyChangePct)}.`,
+            },
+            {
+              id: 'rrhh-consultas',
+              label: 'Consultas & Borradores',
+              value: `${hrInteractionsCount + idbHrPending} registros`,
+              subtext:
+                idbHrPending > 0
+                  ? `${idbHrPending} consulta(s) offline en cola`
+                  : `${idbHrDrafts} borrador(es) activo(s) en IndexedDB`,
+              highlight: idbHrPending > 0 ? 'text-amber-400' : 'text-slate-300',
+              iconKey: 'shield_check',
+              targetElementId: 'nuevo-turno',
+              calculationFormula: `Interacciones de chat RRHH procesadas (${hrInteractionsCount}) + solicitudes en cola offline IndexedDB (${idbHrPending}).`,
+            },
+          ];
+        },
+
+        economico_alertas: () => {
+          const totalExpenses = expenses.reduce((acc, e) => acc + (e.totalAmount || 0), 0);
+          const approvedStatuses = new Set(['aprobada', 'approved', 'contabilizada', 'pagada']);
+          const approvedExpenses = expenses.filter((e) => approvedStatuses.has(e.status));
+          const approvedAmount = approvedExpenses.reduce((acc, e) => acc + (e.totalAmount || 0), 0);
+          const pendingExpenses = expenses.filter(
+            (e) =>
+              e.status === 'pendiente_revision' ||
+              e.status === 'pendiente_aprobacion' ||
+              e.status === 'pending_approval'
+          );
+          const pendingAmount = pendingExpenses.reduce((acc, e) => acc + (e.totalAmount || 0), 0);
+          const alertExpenses = expenses.filter((e) => Boolean(e.auditAlert) || e.status === 'en_disputa');
+          const alertExposure = alertExpenses.reduce((acc, e) => acc + (e.totalAmount || 0), 0);
+          const syncedCount = expenses.filter((e) => e.syncStatus === 'synced').length;
+          const syncedPct = expenses.length > 0 ? Math.round((syncedCount / expenses.length) * 100) : 100;
+
+          return [
+            {
+              id: 'eco-aprobado',
+              label: 'Gasto Conciliado / Aprobado',
+              value: formatEur(approvedAmount),
+              subtext: `${approvedExpenses.length}/${expenses.length} fras (${formatEur(totalExpenses)}) · Ventas ${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)}`,
+              highlight: 'text-cyan-300',
+              iconKey: 'credit_card',
+              drawerHub: 'gastos',
+              calculationFormula: `Suma de ${approvedExpenses.length} facturas aprobadas/pagadas (${formatEur(approvedAmount)}) sobre un total de ${formatEur(totalExpenses)}. Ventas mes: ${formatSignedPct(monthlyPerformanceKPIs.ventas.monthlyChangePct)} vs. ${monthlyPerformanceKPIs.previousMonthLabel}.`,
+            },
+            {
+              id: 'eco-pendiente',
+              label: 'Facturas por Aprobar',
+              value: formatEur(pendingAmount),
+              subtext: `${pendingExpenses.length} doc(s) · Margen tras personal ${monthlyPerformanceKPIs.netMarginAfterLaborPct.toFixed(1)}%`,
+              highlight: pendingExpenses.length > 0 ? 'text-amber-400' : 'text-emerald-400',
+              iconKey: 'trending_up',
+              targetElementId: 'conciliacion-bancaria',
+              calculationFormula: `Importe de ${pendingExpenses.length} documentos sin visto bueno (${formatEur(pendingAmount)}). Margen tras personal = 100% − ${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}% = ${monthlyPerformanceKPIs.netMarginAfterLaborPct.toFixed(1)}%.`,
+            },
+            {
+              id: 'eco-alertas',
+              label: 'Alertas de Tesorería',
+              value: `${alertExpenses.length} (${formatEur(alertExposure)})`,
+              subtext:
+                alertExpenses.length > 0
+                  ? 'Desviaciones de precio o lectura'
+                  : `Coste Laboral controlado: ${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}%`,
+              highlight: alertExpenses.length > 0 ? 'text-rose-400' : 'text-emerald-400',
+              iconKey: 'alert_triangle',
+              targetElementId: 'prevision-liquidez',
+              calculationFormula: `${alertExpenses.length} documento(s) con alerta de auditoría o disputa por valor de ${formatEur(alertExposure)}. Ratio Coste Laboral = ${monthlyPerformanceKPIs.costeLaboral.ratioPct?.toFixed(1)}% (${formatSignedPct(monthlyPerformanceKPIs.costeLaboral.ratioDeltaPts ?? 0).replace('%', ' p.p.')}).`,
+            },
+            {
+              id: 'eco-sync',
+              label: 'Sincronización Contable',
+              value: `${syncedPct}% Cuadrado`,
+              subtext: `${syncedCount}/${expenses.length} registros en central`,
+              highlight: syncedPct === 100 ? 'text-emerald-400' : 'text-amber-400',
+              iconKey: 'check_circle',
+              targetElementId: 'conciliacion-bancaria',
+              calculationFormula: `% Cuadrado = (${syncedCount} documentos sincronizados / ${expenses.length} documentos totales) × 100 = ${syncedPct}%.`,
+            },
+          ];
+        },
+
+        monitor_sync: () => {
+          const queuePending = syncQueue.filter(
+            (item) => item.status === 'pending_offline' || item.status === 'syncing'
+          ).length;
+          const syncedQueueCount = syncQueue.filter((item) => item.status === 'synced').length;
+          const syncedEntitiesCount =
+            punches.filter((p) => p.syncStatus === 'synced').length +
+            expenses.filter((e) => e.syncStatus === 'synced').length +
+            reservations.filter((r) => r.syncStatus === 'synced').length;
+          const activeDraftsCount = idbDrafts.filter((d) => d.dirty).length;
+          const unresolvedConflicts = syncConflicts.filter((c) => !c.resolved).length;
+
+          return [
+            {
+              id: 'sync-pendientes',
+              label: 'Operaciones Pendientes',
+              value: `${pendingSyncCount} pendientes`,
+              subtext: `${queuePending} en cola local · ${idbPendingSubmissions.length} en IndexedDB`,
+              highlight: pendingSyncCount > 0 ? 'text-amber-400' : 'text-emerald-400',
+              iconKey: 'zap',
+              targetElementId: 'cola-transacciones',
+              calculationFormula: `Pendientes totales = ${queuePending} operaciones en cola local + ${idbPendingSubmissions.length} formularios diferidos en IndexedDB.`,
+            },
+            {
+              id: 'sync-conectividad',
+              label: 'Conectividad & Borradores',
+              value: effectiveOnline ? 'En Línea' : 'Modo Offline',
+              subtext: effectiveOnline
+                ? `Sincronización activa · ${activeDraftsCount} borrador(es)`
+                : `Guardando en local · ${activeDraftsCount} borrador(es)`,
+              highlight: effectiveOnline ? 'text-emerald-400' : 'text-amber-400',
+              iconKey: effectiveOnline ? 'wifi' : 'wifi_off',
+              targetElementId: 'cola-transacciones',
+              calculationFormula: `Estado combinado de red del navegador + simulador offline, junto a ${activeDraftsCount} borrador(es) con cambios sin enviar.`,
+            },
+            {
+              id: 'sync-conflictos',
+              label: 'Conflictos de Concurrencia',
+              value: unresolvedConflicts === 0 ? '0 Conflictos' : `${unresolvedConflicts} por resolver`,
+              subtext:
+                unresolvedConflicts === 0
+                  ? 'Protocolo Zero-Data-Loss íntegro'
+                  : 'Requiere decisión del supervisor',
+              highlight: unresolvedConflicts > 0 ? 'text-rose-400' : 'text-cyan-300',
+              iconKey: unresolvedConflicts > 0 ? 'alert_triangle' : 'shield_check',
+              targetElementId: 'cola-transacciones',
+              calculationFormula: `Conteo de colisiones de edición local vs. servidor pendientes de resolución manual (${unresolvedConflicts}).`,
+            },
+            {
+              id: 'sync-sincronizados',
+              label: 'Registros Sincronizados',
+              value: `${syncedEntitiesCount + syncedQueueCount} totales`,
+              subtext: `${syncedEntitiesCount} entidades · Ventas ${formatEur(monthlyPerformanceKPIs.ventas.currentAmount)}`,
+              highlight: 'text-indigo-300',
+              iconKey: 'check_circle',
+              targetElementId: 'cola-transacciones',
+              calculationFormula: `Total sincronizado = ${syncedEntitiesCount} entidades (fichajes + gastos + reservas) + ${syncedQueueCount} eventos procesados en cola.`,
+            },
+          ];
+        },
+      };
+
+      const calculator = kpiCalculatorsByTab[tab] ?? kpiCalculatorsByTab.monitor_sync;
+      return markPriority(calculator());
+    },
+    [
+      activeOperativaTab,
+      activeRole,
+      punches,
+      expenses,
+      reservations,
+      shifts,
+      agentInteractions,
+      syncQueue,
+      syncConflicts,
+      idbDrafts,
+      idbPendingSubmissions,
+      pendingSyncCount,
+      effectiveOnline,
+      monthlyPerformanceKPIs,
+    ]
+  );
+
+  const precalculatedModuleKPIs = useMemo<Record<OperativaTabId, OperativaModuleKPI[]>>(
+    () => ({
+      fichaje: getOperativaModuleKPIs('fichaje', activeRole),
+      gastos: getOperativaModuleKPIs('gastos', activeRole),
+      reservas_voz: getOperativaModuleKPIs('reservas_voz', activeRole),
+      rrhh_turnos: getOperativaModuleKPIs('rrhh_turnos', activeRole),
+      economico_alertas: getOperativaModuleKPIs('economico_alertas', activeRole),
+      monitor_sync: getOperativaModuleKPIs('monitor_sync', activeRole),
+    }),
+    [getOperativaModuleKPIs, activeRole]
+  );
+
+  const getActiveModuleKPIs = useCallback(
+    (tab: OperativaTabId = activeOperativaTab, role: UserRole = activeRole): OperativaModuleKPI[] => {
+      if (role === activeRole) {
+        return precalculatedModuleKPIs[tab] ?? precalculatedModuleKPIs.monitor_sync;
+      }
+      return getOperativaModuleKPIs(tab, role);
+    },
+    [activeOperativaTab, activeRole, precalculatedModuleKPIs, getOperativaModuleKPIs]
+  );
+
+  const getAllOperativaModuleKPIs = useCallback(
+    (role: UserRole = activeRole): Record<OperativaTabId, OperativaModuleKPI[]> =>
+      role === activeRole
+        ? precalculatedModuleKPIs
+        : {
+            fichaje: getOperativaModuleKPIs('fichaje', role),
+            gastos: getOperativaModuleKPIs('gastos', role),
+            reservas_voz: getOperativaModuleKPIs('reservas_voz', role),
+            rrhh_turnos: getOperativaModuleKPIs('rrhh_turnos', role),
+            economico_alertas: getOperativaModuleKPIs('economico_alertas', role),
+            monitor_sync: getOperativaModuleKPIs('monitor_sync', role),
+          },
+    [precalculatedModuleKPIs, getOperativaModuleKPIs, activeRole]
+  );
+
+  const currentOperativaKPIs = useMemo(
+    () => getActiveModuleKPIs(activeOperativaTab, activeRole),
+    [getActiveModuleKPIs, activeOperativaTab, activeRole]
+  );
 
   return (
     <AppContext.Provider
@@ -865,11 +1662,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reservations,
         shifts,
         agentInteractions,
+        getActiveModuleKPIs,
+        getOperativaModuleKPIs,
+        getAllOperativaModuleKPIs,
+        currentOperativaKPIs,
+        monthlyPerformanceKPIs,
         syncQueue,
         syncConflicts,
+        idbDrafts,
+        idbPendingSubmissions,
         pendingSyncCount,
         isSyncingNow,
         triggerManualSync,
+        discardIdbDraft,
         resolveConflict,
         clearResolvedQueue,
         simulateConflictDemo,

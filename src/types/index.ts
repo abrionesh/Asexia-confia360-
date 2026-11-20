@@ -1,3 +1,5 @@
+import type { EntityHubType } from '../services/dataModel360';
+
 export type SyncStatus = 'synced' | 'syncing' | 'pending_offline' | 'conflict';
 
 export interface SyncQueueItem {
@@ -172,3 +174,73 @@ export interface BrandConfig {
   soundFeedback: boolean;
   hapticFeedback: boolean;
 }
+
+export type OperativaTabId =
+  | 'fichaje'
+  | 'gastos'
+  | 'reservas_voz'
+  | 'rrhh_turnos'
+  | 'economico_alertas'
+  | 'monitor_sync';
+
+export type OperativaKPIIconKey =
+  | 'users'
+  | 'shield_check'
+  | 'clock'
+  | 'check_circle'
+  | 'receipt'
+  | 'alert_triangle'
+  | 'trending_up'
+  | 'sparkles'
+  | 'utensils_crossed'
+  | 'mic'
+  | 'calendar'
+  | 'credit_card'
+  | 'zap'
+  | 'wifi'
+  | 'wifi_off';
+
+export interface OperativaModuleKPI {
+  id: string;
+  label: string;
+  value: string;
+  subtext: string;
+  highlight: string;
+  iconKey: OperativaKPIIconKey;
+  targetElementId?: string;
+  drawerHub?: EntityHubType;
+  isRolePriority?: boolean;
+  calculationFormula?: string;
+}
+
+export interface MonthlyPerformanceKPI {
+  id: 'ventas' | 'coste_laboral';
+  label: string;
+  currentAmount: number;
+  previousAmount: number;
+  monthlyChangePct: number;
+  ratioPct?: number;
+  previousRatioPct?: number;
+  ratioDeltaPts?: number;
+  isFavorable: boolean;
+  targetHint: string;
+  driverSummary: string;
+}
+
+export interface DailyPerformancePoint {
+  dayLabel: string;
+  fullDate: string;
+  ventas: number;
+  costeLaboral: number;
+  laborRatioPct: number;
+}
+
+export interface MonthlyPerformanceSummary {
+  currentMonthLabel: string;
+  previousMonthLabel: string;
+  ventas: MonthlyPerformanceKPI;
+  costeLaboral: MonthlyPerformanceKPI;
+  netMarginAfterLaborPct: number;
+  dailySeries7d: DailyPerformancePoint[];
+}
+

@@ -27,12 +27,15 @@ import { PositionalHelpBeacon } from './help/PositionalHelpBeacon';
 export const SyncStatusMonitor: React.FC = () => {
   const {
     syncQueue,
+    idbDrafts,
+    idbPendingSubmissions,
     pendingSyncCount,
     isOnline,
     isSimulatedOffline,
     toggleSimulatedOffline,
     isSyncingNow,
     triggerManualSync,
+    discardIdbDraft,
     clearResolvedQueue,
     announceAriaLive,
   } = useApp();
@@ -199,8 +202,61 @@ export const SyncStatusMonitor: React.FC = () => {
         </div>
       </div>
 
+      {/* IndexedDB Operational Forms Persistence Summary */}
+      {(idbPendingSubmissions.length > 0 || idbDrafts.length > 0) && (
+        <div className="bg-white rounded-3xl border border-blue-200 p-5 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-[#0067B9]" />
+              <h3 className="text-sm font-bold font-brand text-[#022853]">
+                Formularios Persistidos en IndexedDB
+              </h3>
+            </div>
+            <span className="text-xs text-slate-500">
+              {idbPendingSubmissions.length} envíos pendientes · {idbDrafts.length} borradores activos
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            {idbPendingSubmissions.map((sub) => (
+              <div key={sub.id} className="p-3 rounded-2xl border border-amber-200 bg-amber-50/50 flex items-center justify-between gap-2">
+                <div>
+                  <span className="font-bold text-[#022853] block uppercase">
+                    Envío Offline · {getModuleLabel(sub.module)}
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Capturado a las {new Date(sub.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · Reintentos: {sub.retryCount}
+                  </span>
+                </div>
+                <SyncStatusIndicator status={sub.status === 'syncing' ? 'syncing' : 'pending_offline'} />
+              </div>
+            ))}
+
+            {idbDrafts.map((draft) => (
+              <div key={draft.formId} className="p-3 rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-2">
+                <div>
+                  <span className="font-bold text-slate-800 block uppercase">
+                    Borrador · {getModuleLabel(draft.module)}
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Actualizado a las {new Date(draft.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => discardIdbDraft(draft.formId)}
+                  className="px-2.5 py-1 rounded-lg bg-white border border-slate-300 hover:border-rose-300 hover:text-rose-700 font-semibold text-[11px] transition"
+                >
+                  Descartar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Filter Tabs & Task List Card */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-5">
+      <div id="cola-transacciones" className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-5 scroll-mt-6">
         
         {/* Header Filter Strip */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">

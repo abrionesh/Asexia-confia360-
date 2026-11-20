@@ -17,6 +17,7 @@ export const DataExplorerTable: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [moduleFilter, setModuleFilter] = useState('all');
   const [selectedRow, setSelectedRow] = useState<typeof EXPLORER_TABLE_ROWS[0] | null>(null);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   const filteredRows = EXPLORER_TABLE_ROWS.filter((r) => {
     const matchesModule = moduleFilter === 'all' || r.modulo === moduleFilter;
@@ -28,7 +29,35 @@ export const DataExplorerTable: React.FC = () => {
   });
 
   const handleExport = (format: 'CSV' | 'XLSX' | 'PDF') => {
-    alert(`Exportación a ${format} generada y registrada en el registro de auditoría.`);
+    const headers = ['Identificador', 'Modulo', 'Entidad', 'Local', 'Descripcion', 'Fecha', 'Importe', 'Estado', 'Sync'];
+    const escapeCsv = (val: unknown) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+    const csvContent = [
+      headers.join(','),
+      ...filteredRows.map((r) =>
+        [r.identificador, r.modulo, r.entidad, r.local, r.descripcion, r.fecha, r.importe, r.estado, r.sync]
+          .map(escapeCsv)
+          .join(',')
+      ),
+    ].join('\n');
+
+    if (format === 'PDF') {
+      window.print();
+    } else {
+      const ext = format === 'XLSX' ? 'xls' : 'csv';
+      const mime = format === 'XLSX' ? 'application/vnd.ms-excel;charset=utf-8;' : 'text/csv;charset=utf-8;';
+      const blob = new Blob([`\uFEFF${csvContent}`], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `confia360_auditoria_${new Date().toISOString().slice(0, 10)}.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    setExportNotice(`Exportación ${format} generada (${filteredRows.length} registros) y registrada en auditoría.`);
+    setTimeout(() => setExportNotice(null), 4500);
   };
 
   return (
@@ -73,6 +102,22 @@ export const DataExplorerTable: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {exportNotice && (
+        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-900 flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle className="w-4 h-4 text-[#48A222]" />
+            {exportNotice}
+          </span>
+          <button
+            type="button"
+            onClick={() => setExportNotice(null)}
+            className="text-emerald-700 hover:underline font-bold"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row gap-2.5">

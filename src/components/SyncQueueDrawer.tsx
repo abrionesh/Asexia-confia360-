@@ -40,9 +40,12 @@ export const SyncQueueDrawer: React.FC<{ isOpen: boolean; onClose: () => void }>
   const {
     syncQueue,
     syncConflicts,
+    idbDrafts,
+    idbPendingSubmissions,
     isOnline,
     isSyncingNow,
     triggerManualSync,
+    discardIdbDraft,
     resolveConflict,
     clearResolvedQueue,
     simulateConflictDemo,
@@ -138,7 +141,43 @@ export const SyncQueueDrawer: React.FC<{ isOpen: boolean; onClose: () => void }>
                 )}
               </div>
 
-              {syncQueue.length === 0 ? (
+              {(idbPendingSubmissions.length > 0 || idbDrafts.length > 0) && (
+                <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/60 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#022853]">
+                    <span>Persistencia IndexedDB ({idbPendingSubmissions.length} envíos · {idbDrafts.length} borradores)</span>
+                  </div>
+                  {idbPendingSubmissions.map((sub) => (
+                    <div key={sub.id} className="p-2 rounded-lg bg-white border border-blue-100 flex items-center justify-between text-[11px]">
+                      <div>
+                        <span className="font-bold text-[#022853] uppercase">{sub.module}</span>
+                        <span className="text-slate-500 block">
+                          Pendiente · {new Date(sub.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <SyncStatusIndicator status={sub.status === 'syncing' ? 'syncing' : 'pending_offline'} />
+                    </div>
+                  ))}
+                  {idbDrafts.map((draft) => (
+                    <div key={draft.formId} className="p-2 rounded-lg bg-white border border-slate-200 flex items-center justify-between text-[11px]">
+                      <div>
+                        <span className="font-bold text-slate-700 uppercase">Borrador · {draft.module}</span>
+                        <span className="text-slate-400 block">
+                          Guardado {new Date(draft.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => discardIdbDraft(draft.formId)}
+                        className="text-rose-600 hover:underline font-semibold"
+                      >
+                        Descartar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {syncQueue.length === 0 && idbPendingSubmissions.length === 0 ? (
                 <div className="text-center py-12 px-4">
                   <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
                     <CheckCircle2 className="w-6 h-6" />

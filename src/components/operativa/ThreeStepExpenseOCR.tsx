@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ApiService } from '../../services/api';
 import { SyncStatusIndicator } from '../SyncQueueDrawer';
+import { useIndexedDbFormState } from '../../hooks/useIndexedDbFormState';
 import {
   Camera,
   Upload,
@@ -29,10 +30,59 @@ import {
   X,
   ChevronRight,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 import { ExpenseTicket, DocumentType, InvoiceStatus, InvoiceProductLine } from '../../types';
 import { PositionalHelpBeacon } from '../help/PositionalHelpBeacon';
 import { Invoice360Modal } from './Invoice360Modal';
+
+interface ExpenseFormDraftState extends Record<string, unknown> {
+  step: 1 | 2;
+  ticketImage: string | null;
+  isProVersionEnabled: boolean;
+  docType: DocumentType;
+  invoiceStatus: InvoiceStatus;
+  providerName: string;
+  invoiceNumber: string;
+  date: string;
+  dueDate: string;
+  taxBase: number;
+  vatRate: number;
+  vatAmount: number;
+  totalAmount: number;
+  category: string;
+  auditAlert: string | null;
+  productLines: InvoiceProductLine[];
+  ocrFromOfflineFallback?: boolean;
+}
+
+interface SubmittedReceiptSummary {
+  providerName: string;
+  totalAmount: number;
+  category: string;
+  invoiceStatus: InvoiceStatus;
+  queuedOffline: boolean;
+}
+
+const INITIAL_EXPENSE_DRAFT: ExpenseFormDraftState = {
+  step: 1,
+  ticketImage: null,
+  isProVersionEnabled: true,
+  docType: 'factura',
+  invoiceStatus: 'pendiente_aprobacion',
+  providerName: '',
+  invoiceNumber: '',
+  date: new Date().toISOString().split('T')[0],
+  dueDate: '2026-11-15',
+  taxBase: 0,
+  vatRate: 10,
+  vatAmount: 0,
+  totalAmount: 0,
+  category: 'Materia Prima / Perecederos',
+  auditAlert: null,
+  productLines: [],
+  ocrFromOfflineFallback: undefined,
+};
 
 export const getInvoiceStatusLabel = (st: InvoiceStatus): string => {
   switch (st) {
@@ -91,32 +141,99 @@ export const getInvoiceStatusBadgeClass = (st: InvoiceStatus): string => {
 export const ThreeStepExpenseOCR: React.FC = () => {
   const { expenses, saveExpenseTicket, approveExpenseTicket, isOnline, setActiveView } = useApp();
 
-  // 3-step state: 1. capture, 2. review, 3. complete
-  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isProcessingOcr, setIsProcessingOcr] = useState(false);
-  const [ticketImage, setTicketImage] = useState<string | null>(null);
+  const [submittedReceipt, setSubmittedReceipt] = useState<SubmittedReceiptSummary | null>(null);
 
   // 360 Sheet Modal Selection
   const [selectedInvoiceFor360, setSelectedInvoiceFor360] = useState<ExpenseTicket | null>(null);
 
   // Filter in bottom table
   const [statusFilter, setStatusFilter] = useState<'all' | 'en_disputa' | 'pendiente' | 'aprobada' | 'contabilizada' | 'pagada' | 'borrador'>('all');
-  const [isProVersionEnabled, setIsProVersionEnabled] = useState<boolean>(true);
 
-  // Extracted fields in step 2 (editable)
-  const [docType, setDocType] = useState<DocumentType>('factura');
-  const [invoiceStatus, setInvoiceStatus] = useState<InvoiceStatus>('pendiente_aprobacion');
-  const [providerName, setProviderName] = useState('');
-  const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [dueDate, setDueDate] = useState('2026-11-15');
-  const [taxBase, setTaxBase] = useState<number>(0);
-  const [vatRate, setVatRate] = useState<number>(10);
-  const [vatAmount, setVatAmount] = useState<number>(0);
-  const [totalAmount, setTotalAmount] = useState<number>(0);
-  const [category, setCategory] = useState('Materia Prima / Perecederos');
-  const [auditAlert, setAuditAlert] = useState<string | null>(null);
-  const [productLines, setProductLines] = useState<InvoiceProductLine[]>([]);
+  const syncExpensePayload = useCallback(
+    async (draft: ExpenseFormDraftState) => {
+      await saveExpenseTicket({
+        providerName: draft.providerName,
+        documentType: draft.docType,
+        invoiceNumber: draft.invoiceNumber || 'S/N-PROV',
+        date: draft.date,
+        dueDate: draft.dueDate,
+        taxBase: draft.taxBase,
+        vatRate: draft.vatRate,
+        vatAmount: draft.vatAmount,
+        totalAmount: draft.totalAmount,
+        category: draft.category,
+        suggestedCategory: draft.category,
+        status: draft.invoiceStatus,
+        auditAlert: draft.auditAlert,
+        productLines: draft.productLines,
+        hasEscandalloImpact: draft.productLines.some((p) => !!p.linkedDishName),
+        linkedVenue: 'Restaurante Puerta del Sol (Centro)',
+        paymentMethod: 'Transferencia a 30 días',
+        isProVersionEnabled: draft.isProVersionEnabled,
+        createdBy: 'Empleado de Sala / Cocina',
+        imageUrl: draft.ticketImage || undefined,
+      });
+    },
+    [saveExpenseTicket]
+  );
+
+  const {
+    formState: draft,
+    setFormState: setDraft,
+    updateField,
+    hasRecoveredDraft,
+    dismissRecoveredNotice,
+    pendingSubmissionsCount,
+    isSyncingPending,
+    queueSubmission,
+    flushPendingSubmissions,
+    clearDraft,
+  } = useIndexedDbFormState<ExpenseFormDraftState>({
+    formId: 'operativa_gastos_ocr',
+    module: 'gastos',
+    initialState: INITIAL_EXPENSE_DRAFT,
+    isOnline,
+    onSyncPending: syncExpensePayload,
+    isDraftDirty: (state) =>
+      state.step === 2 ||
+      Boolean(state.ticketImage) ||
+      state.providerName.trim().length > 0 ||
+      state.invoiceNumber.trim().length > 0 ||
+      state.productLines.length > 0,
+  });
+
+  const step: 1 | 2 | 3 = submittedReceipt ? 3 : draft.step;
+  const {
+    ticketImage,
+    isProVersionEnabled,
+    docType,
+    invoiceStatus,
+    providerName,
+    invoiceNumber,
+    date,
+    dueDate,
+    taxBase,
+    vatRate,
+    vatAmount,
+    totalAmount,
+    category,
+    auditAlert,
+    productLines,
+  } = draft;
+
+  const setTicketImage = (val: string | null) => updateField('ticketImage', val);
+  const setIsProVersionEnabled = (val: boolean) => updateField('isProVersionEnabled', val);
+  const setDocType = (val: DocumentType) => updateField('docType', val);
+  const setInvoiceStatus = (val: InvoiceStatus) => updateField('invoiceStatus', val);
+  const setProviderName = (val: string) => updateField('providerName', val);
+  const setInvoiceNumber = (val: string) => updateField('invoiceNumber', val);
+  const setDate = (val: string) => updateField('date', val);
+  const setTaxBase = (val: number) => updateField('taxBase', val);
+  const setVatRate = (val: number) => updateField('vatRate', val);
+  const setVatAmount = (val: number) => updateField('vatAmount', val);
+  const setTotalAmount = (val: number) => updateField('totalAmount', val);
+  const setCategory = (val: string) => updateField('category', val);
 
   // Quick sample images simulation for demo with 360 entities
   const sampleTickets = [
@@ -258,29 +375,36 @@ export const ThreeStepExpenseOCR: React.FC = () => {
   ];
 
   // Step 1: Capture
-  const handleSelectSample = async (sample: typeof sampleTickets[0]) => {
+  const handleSelectSample = async (sample: typeof sampleTickets[0], customImage?: string) => {
+    setSubmittedReceipt(null);
     setIsProcessingOcr(true);
-    setTicketImage(`data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400"><rect width="300" height="400" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2"/><text x="20" y="40" font-family="sans-serif" font-size="14" font-weight="bold" fill="%23022853">${sample.provider}</text><text x="20" y="80" font-family="sans-serif" font-size="12" fill="%2364748b">${sample.docType.toUpperCase()}: ${sample.num}</text><text x="20" y="110" font-family="sans-serif" font-size="12" fill="%2364748b">Total: ${sample.total} EUR</text></svg>`);
-    
+    const defaultImage = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400"><rect width="300" height="400" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2"/><text x="20" y="40" font-family="sans-serif" font-size="14" font-weight="bold" fill="%23022853">${sample.provider}</text><text x="20" y="80" font-family="sans-serif" font-size="12" fill="%2364748b">${sample.docType.toUpperCase()}: ${sample.num}</text><text x="20" y="110" font-family="sans-serif" font-size="12" fill="%2364748b">Total: ${sample.total} EUR</text></svg>`;
+    const resolvedImage = customImage || defaultImage;
+
     // Call server OCR or simulate extraction
     try {
       const ocrResult = await ApiService.processEconomicOCR({ sampleText: sample.provider });
-      setDocType(sample.docType);
-      setInvoiceStatus(sample.status);
-      setProviderName(ocrResult.providerName || sample.provider);
-      setInvoiceNumber(ocrResult.invoiceNumber || sample.num);
-      setDate(ocrResult.date || new Date().toISOString().split('T')[0]);
-      setDueDate('2026-11-15');
-      setTaxBase(ocrResult.taxBase || sample.base);
-      setVatRate(ocrResult.vatRate || sample.vat);
-      setVatAmount(ocrResult.vatAmount || sample.vatAm);
-      setTotalAmount(ocrResult.totalAmount || sample.total);
-      setCategory(ocrResult.suggestedCategory || sample.category);
-      setAuditAlert(sample.alert || ocrResult.auditAlert);
-      setProductLines(sample.productLines || []);
+      setDraft((prev) => ({
+        ...prev,
+        step: 2,
+        ticketImage: resolvedImage,
+        docType: sample.docType,
+        invoiceStatus: sample.status,
+        providerName: ocrResult.providerName || sample.provider,
+        invoiceNumber: ocrResult.invoiceNumber || sample.num,
+        date: ocrResult.date || new Date().toISOString().split('T')[0],
+        dueDate: '2026-11-15',
+        taxBase: ocrResult.taxBase || sample.base,
+        vatRate: ocrResult.vatRate || sample.vat,
+        vatAmount: ocrResult.vatAmount || sample.vatAm,
+        totalAmount: ocrResult.totalAmount || sample.total,
+        category: ocrResult.suggestedCategory || sample.category,
+        auditAlert: sample.alert || ocrResult.auditAlert,
+        productLines: sample.productLines || [],
+        ocrFromOfflineFallback: ocrResult.fromOfflineFallback,
+      }));
     } finally {
       setIsProcessingOcr(false);
-      setStep(2); // Advance to Step 2: Revisión
     }
   };
 
@@ -290,38 +414,24 @@ export const ThreeStepExpenseOCR: React.FC = () => {
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
-        setTicketImage(reader.result as string);
-        handleSelectSample(sampleTickets[0]);
+        const imageDataUrl = reader.result as string;
+        setTicketImage(imageDataUrl);
+        handleSelectSample(sampleTickets[0], imageDataUrl);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Step 3: Envío con un toque
+  // Step 3: Envío con un toque (persiste en IndexedDB si offline)
   const handleSubmitExpense = async () => {
-    await saveExpenseTicket({
-      providerName,
-      documentType: docType,
-      invoiceNumber: invoiceNumber || 'S/N-PROV',
-      date,
-      dueDate,
-      taxBase,
-      vatRate,
-      vatAmount,
+    const summarySnapshot: Omit<SubmittedReceiptSummary, 'queuedOffline'> = {
+      providerName: providerName || 'Proveedor sin especificar',
       totalAmount,
       category,
-      suggestedCategory: category,
-      status: invoiceStatus,
-      auditAlert,
-      productLines,
-      hasEscandalloImpact: productLines.some(p => !!p.linkedDishName),
-      linkedVenue: 'Restaurante Puerta del Sol (Centro)',
-      paymentMethod: 'Transferencia a 30 días',
-      isProVersionEnabled,
-      createdBy: 'Empleado de Sala / Cocina',
-      imageUrl: ticketImage || undefined,
-    });
-    setStep(3);
+      invoiceStatus,
+    };
+    const { queuedOffline } = await queueSubmission(draft);
+    setSubmittedReceipt({ ...summarySnapshot, queuedOffline });
   };
 
   const handleOpen360ForCurrentReview = () => {
@@ -352,13 +462,9 @@ export const ThreeStepExpenseOCR: React.FC = () => {
     });
   };
 
-  const handleResetFlow = () => {
-    setStep(1);
-    setTicketImage(null);
-    setProviderName('');
-    setInvoiceNumber('');
-    setAuditAlert(null);
-    setProductLines([]);
+  const handleResetFlow = async () => {
+    setSubmittedReceipt(null);
+    await clearDraft();
   };
 
   return (
@@ -415,6 +521,54 @@ export const ThreeStepExpenseOCR: React.FC = () => {
             ))}
           </div>
         </div>
+
+        {/* IndexedDB Offline Draft & Pending Sync Banners */}
+        {(hasRecoveredDraft || pendingSubmissionsCount > 0) && (
+          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            {hasRecoveredDraft && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-[#022853]">
+                <Clock className="w-4 h-4 text-[#0067B9] shrink-0" />
+                <span>
+                  Borrador guardado automáticamente en IndexedDB recuperado.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleResetFlow}
+                  className="ml-1 font-bold text-rose-700 hover:underline"
+                >
+                  Descartar
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissRecoveredNotice}
+                  className="text-slate-400 hover:text-slate-700"
+                  aria-label="Ocultar aviso de borrador"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {pendingSubmissionsCount > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">
+                <RefreshCw className={`w-4 h-4 text-amber-700 shrink-0 ${isSyncingPending ? 'animate-spin' : ''}`} />
+                <span>
+                  <strong>{pendingSubmissionsCount}</strong>{' '}
+                  {pendingSubmissionsCount === 1 ? 'documento pendiente' : 'documentos pendientes'} en cola offline IndexedDB
+                </span>
+                {isOnline && !isSyncingPending && (
+                  <button
+                    type="button"
+                    onClick={() => flushPendingSubmissions()}
+                    className="ml-1 px-2 py-0.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition"
+                  >
+                    Sincronizar
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* STEP 1: CAPTURA CON BOTÓN GIGANTE */}
@@ -483,7 +637,20 @@ export const ThreeStepExpenseOCR: React.FC = () => {
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
-              <h3 className="text-base font-bold text-[#022853] font-brand">Paso 2: Revisión en Pantalla Partida</h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-bold text-[#022853] font-brand">Paso 2: Revisión en Pantalla Partida</h3>
+                {draft.ocrFromOfflineFallback !== undefined && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                      draft.ocrFromOfflineFallback
+                        ? 'bg-amber-50 text-amber-800 border-amber-300'
+                        : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                    }`}
+                  >
+                    {draft.ocrFromOfflineFallback ? 'Extracción Local (Sin Red)' : 'OCR IA Central'}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-500">
                 Compara la imagen con los datos leídos. Los campos faltantes o alertas se resaltan automáticamente en amarillo.
               </p>
@@ -872,21 +1039,30 @@ export const ThreeStepExpenseOCR: React.FC = () => {
       )}
 
       {/* STEP 3: COMPLETED SUCCESS VIEW */}
-      {step === 3 && (
+      {step === 3 && submittedReceipt && (
         <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-xs text-center space-y-4 max-w-lg mx-auto animate-in zoom-in-95 duration-200">
           <div className="w-16 h-16 rounded-full bg-emerald-100 text-[#48A222] flex items-center justify-center mx-auto">
             <CheckCircle className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="text-lg font-bold font-brand text-[#022853]">¡Documento Registrado con Éxito!</h3>
+            <h3 className="text-lg font-bold font-brand text-[#022853]">
+              {submittedReceipt.queuedOffline
+                ? 'Documento Guardado Offline (IndexedDB)'
+                : '¡Documento Registrado con Éxito!'}
+            </h3>
             <p className="text-xs text-slate-500 mt-1">
-              {providerName} — <strong>{totalAmount.toFixed(2)} €</strong> ({category})
+              {submittedReceipt.providerName} — <strong>{submittedReceipt.totalAmount.toFixed(2)} €</strong> ({submittedReceipt.category})
             </p>
           </div>
           <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-600 text-left border border-slate-200 space-y-1">
-            <p>• <strong>Estado:</strong> {getInvoiceStatusLabel(invoiceStatus)}</p>
+            <p>• <strong>Estado:</strong> {getInvoiceStatusLabel(submittedReceipt.invoiceStatus)}</p>
             <p>• <strong>Conexión 360º:</strong> Productos, escandallos y tesorería sincronizados</p>
-            <p>• <strong>Modo:</strong> {isOnline ? '🟢 Sincronizado en Central' : '🔵 En Cola Offline Local'}</p>
+            <p>
+              • <strong>Modo:</strong>{' '}
+              {submittedReceipt.queuedOffline
+                ? '🔵 Guardado en IndexedDB · Se sincronizará al recuperar conexión'
+                : '🟢 Sincronizado en Central'}
+            </p>
           </div>
           <div className="pt-2 flex gap-3">
             <button
@@ -900,7 +1076,7 @@ export const ThreeStepExpenseOCR: React.FC = () => {
       )}
 
       {/* Expense History & Approvals Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+      <div id="alertas-gastos" className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4 scroll-mt-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-[#48A222]" />
